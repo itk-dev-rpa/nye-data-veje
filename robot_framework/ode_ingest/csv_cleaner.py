@@ -10,8 +10,8 @@ from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConn
 
 
 @dataclass
-class DateColumn:
-    """Dataclass for setting the date range for a data upload.
+class DateRangeColumn:
+    """Dataclass for setting the date range targeting a specific column for a data upload.
     """
     column: str | list[str]
     start_date: str
@@ -75,7 +75,7 @@ class CSVCleaner:
                             table_keys: Optional[List[str]] = None,
                             date_columns: Optional[List[str]] = None,
                             number_columns: Optional[List[str]] = None,
-                            date_filter: Optional[DateColumn] = None) -> pd.DataFrame:
+                            date_filter: Optional[DateRangeColumn] = None) -> pd.DataFrame:
         """
         Read CSV with automatic data type conversion.
 
@@ -289,7 +289,7 @@ class CSVCleaner:
 
         return 'text'
 
-    def _apply_date_filter(self, df: pd.DataFrame, date_filter: DateColumn) -> pd.DataFrame:
+    def _apply_date_filter(self, df: pd.DataFrame, date_filter: DateRangeColumn) -> pd.DataFrame:
         """Filter data frame based on date interval.
 
         Args:

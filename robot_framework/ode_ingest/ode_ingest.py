@@ -13,31 +13,28 @@ from sqlalchemy.exc import SQLAlchemyError
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 
 from robot_framework import config
-from robot_framework.ode_ingest.csv_cleaner import CSVCleaner, DateColumn
+from robot_framework.ode_ingest.csv_cleaner import CSVCleaner, DateRangeColumn
 from robot_framework.ode_ingest.table_columns import table_keys, table_used_columns
 
 
-def find_files(directory: str, partial_names: list[str]):
-    """Return files containing any of a list of partial names.
+def find_files(directory: str, partial_name: str):
+    """Return files containing partial name.
 
     Args:
         directory: Directory of files to look for.
-        partial_names: List of partial filenames, eg "BO-aaben", "Bilag-master_Total
+        partial_name: Partial filename, eg "BO-aaben", "Bilag-master_Total
 
     Returns:
-        List of files from directory matching list of names.
+        List of files from directory matching partial name.
     """
     files = []
     for filename in Path(directory).iterdir():
-        for partial_name in partial_names:
-            if partial_name in filename.name:
-                files.append(str(filename))
+        if partial_name in filename.name:
+            files.append(str(filename))
     return files
 
 
-def insert_data(df: pd.DataFrame,
-                table_name: str,
-                engine: Engine):
+def insert_data(df: pd.DataFrame, table_name: str, engine: Engine):
     """Add data to SQL.
 
     Args:
@@ -53,7 +50,7 @@ def insert_data(df: pd.DataFrame,
         conn.execute(table.insert(), df.to_dict('records'))
 
 
-def create_dataframe_from_file(file_path: str, table_name: str, oc: OrchestratorConnection, date_filter: Optional[DateColumn] = None) -> pd.DataFrame:
+def create_dataframe_from_file(file_path: str, table_name: str, oc: OrchestratorConnection, date_filter: Optional[DateRangeColumn] = None) -> pd.DataFrame:
     """Create a dataframe from a file.
 
     Args:
@@ -187,7 +184,7 @@ def merge_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine
     temp_table = f"#temp_{table_name}_{int(time.time())}"
 
     # 1. Upload dataframe to temporary table
-    metadata = MetaData(schema='ode')
+    metadata = MetaData(schema=config.DB_SCHEMA)
     Table(temp_table, metadata, *[Column(col, String(255)) for col in list(df.columns)])
     metadata.create_all(engine)
 

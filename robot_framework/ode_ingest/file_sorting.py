@@ -23,8 +23,8 @@ def _extract_date_from_filename(filename: str) -> Optional[datetime]:
         date_str = match.group(1)
         try:
             return datetime.strptime(date_str, '%Y-%m-%d')
-        except ValueError:
-            return None
+        except ValueError as e:
+            raise ValueError(f"Date '{date_str}' did not convert to pattern '%Y-%m-%d'") from e
     return None
 
 
@@ -38,7 +38,6 @@ def _extract_sequence_number(filename: str) -> int:
     Returns:
         Sequence number (002 in example) or 0 if not found
     """
-    # Match sekvensnummer efter dato - antager format _XXX_
     seq_pattern = r'_(\d{3})_'
     match = re.search(seq_pattern, filename)
 
@@ -50,15 +49,15 @@ def _extract_sequence_number(filename: str) -> int:
 def get_file_sort_key(filepath: str) -> Tuple[datetime, int, str]:
     """
     Create a sort-key for a filename based on:
-    1. Date stamp (oldest first)
-    2. Sequence number (lowest first)
-    3. Filename (alphabetical tiebreaker)
+    1. Date stamp (oldest first).
+    2. Sequence number (lowest first).
+    3. Filename (alphabetical tiebreaker).
 
     Args:
-        filepath: Fuld sti til fil
+        filepath: Full path to file.
 
     Returns:
-        Tuple der kan bruges til sortering
+        Tuple useable for sorting.
     """
     filename = Path(filepath).name
 

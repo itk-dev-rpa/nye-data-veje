@@ -1,6 +1,11 @@
 """Configurations for this robot."""
 
-FILE_DIRECTORY = '\\\\adm.aarhuskommune.dk\\AAK\\Faelles\\MKB\\BackofficeDebitor_Rapporter'
-CONNECTION_STRING = 'mssql+pyodbc://@SRVSQLHOTEL05/{DB_NAME}?trusted_connection=yes&driver=ODBC+Driver+17+for+SQL+Server'
-DB_NAME = "BackDataLake-Test"
 DB_SCHEMA = "ode"
+
+# Error screenshot config
+SMTP_SERVER = "smtp.adm.aarhuskommune.dk"
+SMTP_PORT = 25
+SCREENSHOT_SENDER = "robot@friend.dk"
+
+# The number of times the robot retries on an error before terminating.
+MAX_RETRY_COUNT = 3

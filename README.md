@@ -15,3 +15,11 @@ In OO, you must provide the following process arguments:
 The arguments above will be used to update delta data daily, and will be the most common usage scenario.
 If you need to set up new tables or reload total data, you should set create_table and/or insert_total_data to True.
 Use "from_to_date": ["01011999", "01012025"] to define a date range for total data ingest.
+
+OO also needs two constants present:
+```
+NDV File Directory = \\\\adm.aarhuskommune.dk\\AAK\\Faelles\\MKB\\BackofficeDebitor_Rapporter
+```
+```
+NDV Connection String = mssql+pyodbc://@SRVSQLHOTEL05/BackDataLake-Test?trusted_connection=yes&driver=ODBC+Driver+17+for+SQL+Server
+```
