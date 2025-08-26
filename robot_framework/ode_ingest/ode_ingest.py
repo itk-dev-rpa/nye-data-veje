@@ -8,13 +8,13 @@ from typing import Optional
 
 import pandas as pd
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, text, Engine, Table, Column, String, MetaData, PrimaryKeyConstraint
+from sqlalchemy import create_engine, text, Engine, Table, Column, String, MetaData, PrimaryKeyConstraint, Date, Numeric
 from sqlalchemy.exc import SQLAlchemyError
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 
 from robot_framework import config
 from robot_framework.ode_ingest.csv_cleaner import CSVCleaner, DateRangeColumn
-from robot_framework.ode_ingest.table_columns import table_keys, table_used_columns
+from robot_framework.ode_ingest.table_columns import table_keys, table_used_columns, data_types
 
 
 def find_files(directory: str, partial_name: str):
@@ -42,7 +42,6 @@ def insert_data(df: pd.DataFrame, table_name: str, engine: Engine):
         table_name: SQL table to add data to.
         engine: SQL Engine to use.
     """
-    print("Uploading to SQL")
     metadata = MetaData()
     table = Table(table_name, metadata, autoload_with=engine, schema=config.DB_SCHEMA)
 
@@ -66,11 +65,10 @@ def create_dataframe_from_file(file_path: str, table_name: str, oc: Orchestrator
     if not csv_file.exists():
         return None
 
-    cleaner = CSVCleaner()
-    analysis = cleaner.analyze_csv(csv_file)
-    date_cols = [col for col, type_ in analysis['suggested_types'].items() if type_ == 'date']
-    num_cols = [col for col, type_ in analysis['suggested_types'].items() if type_ == 'number']
+    date_cols = [col for col, type_ in data_types[table_name].items() if type_ == 'date']
+    num_cols = [col for col, type_ in data_types[table_name].items() if type_ == 'number']
 
+    cleaner = CSVCleaner()
     df = cleaner.read_csv_with_types(
             csv_file,
             oc,
@@ -238,16 +236,16 @@ def merge_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine
         pass  # Temp tables are cleaned automatically
 
 
-def create_table(table_name: str, columns: list[str]):
+def create_table(table_name: str, columns: list[str], connection_string: str):
     """Create table in the SQL database with the table name and columns.
 
     Args:
         table_name: Table name for the table.
         columns: Columns for the table.
     """
-    engine = create_engine(config.CONNECTION_STRING.replace("{DB_NAME}", config.DB_NAME))
+    engine = create_engine(connection_string)
 
-    metadata = MetaData(schema='ode')
+    metadata = MetaData(schema=config.DB_SCHEMA)
     primary_keys = table_keys[table_name] if table_name in table_keys else None
 
     columns = set()
@@ -255,6 +253,15 @@ def create_table(table_name: str, columns: list[str]):
         if table_name in table_dict and table_dict[table_name]:
             columns.update(table_dict[table_name])
 
+    # type_mapping = {
+    #     'text': String(255),
+    #     'number': Numeric(precision=15, scale=2),
+    #     'date': Date
+    # }
+    # columns_list = []
+    # for col in table_used_columns[table_name]:
+    #     column_type = type_mapping[data_types[table_name][col]]
+    #     columns_list.append(Column(col, column_type))
     columns_list = [Column(col, String(255)) for col in columns]
 
     if primary_keys:

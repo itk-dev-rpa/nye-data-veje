@@ -1,6 +1,7 @@
 """Configurations for this robot."""
 
 DB_SCHEMA = "ode"
+DB_NAME = "BackDataLake-Test"
 
 # Error screenshot config
 SMTP_SERVER = "smtp.adm.aarhuskommune.dk"

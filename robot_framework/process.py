@@ -41,7 +41,7 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
     for table in tables:
         if create_table:
             orchestrator_connection.log_trace(f"Create table for {table}")
-            upload_tables.create_table(table)
+            upload_tables.create_table(table, orchestrator_connection)
         if insert_total_data:
             orchestrator_connection.log_trace(f"Inserting total data for {table}")
             upload_tables.insert_total_data(table, orchestrator_connection, from_to_date=from_to_date)
@@ -54,8 +54,8 @@ if __name__ == "__main__":
     conn_string = os.getenv("OpenOrchestratorConnString")
     crypto_key = os.getenv("OpenOrchestratorKey")
     arguments = {
-        "create_table": False,
-        "insert_total_data": False,
+        "create_table": True,
+        "insert_total_data": True,
         "insert_delta_data": True,
         "from_to_date": None
     }

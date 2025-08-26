@@ -124,6 +124,14 @@ class CSVCleaner:
         # Convert empty strings to NULL
         df = df.replace(['', ' ', 'nan', 'NaN', np.nan], pd.NA).convert_dtypes()
 
+        # Check for null in key columns
+        if table_keys:
+            null_keys = pd.isnull(df[table_keys]).all(1)
+            null_df = df[null_keys]
+            if len(null_df) > 0:
+                oc.log_error(f"Missing keys from {filepath}:\n {null_df}")
+                df = df[~null_keys]
+
         return df
 
     def _clean_basic_data(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -198,14 +206,19 @@ class CSVCleaner:
             if col not in df.columns:
                 continue
 
-            has_decimals = df[col].astype(str).str.contains(',', na=False).any()
+            # build a mask of negative numbers in wrong format
+            m_neg = df[col].str.endswith("-")
+            df[col] = df[col].str.rstrip("-")
 
+            # Format numbers with or without decimals
+            has_decimals = df[col].astype(str).str.contains(',', na=False).any()
             if has_decimals:
                 df[col] = self._safe_float_conversion(df[col])
             else:
                 df[col] = np.floor(pd.to_numeric(df[col].str.replace(".", ""), errors='coerce')).astype('Int64')
 
-            df[col].fillna(0)
+            # Apply the mask to recreate the negatives
+            df[col] = np.where(m_neg, -df[col], df[col])
 
         return df
 
@@ -244,7 +257,7 @@ class CSVCleaner:
 
         for encoding in self.encodings:
             try:
-                sample_df = pd.read_csv(filepath, dtype=str, encoding=encoding, nrows=100, **self.csv_config)
+                sample_df = pd.read_csv(filepath, dtype=str, encoding=encoding, nrows=1000, **self.csv_config)
                 break
             except UnicodeDecodeError:
                 continue
@@ -278,11 +291,11 @@ class CSVCleaner:
 
         # Check for dates
         for pattern in self.date_patterns:
-            if non_null.str.match(pattern).any():
+            if non_null.str.match(pattern).all():
                 return 'date'
 
         # Check for numbers: is a digit without leading zeroes, unless everything is zero
-        is_numeric = non_null.str.replace('[,.]', '', regex=True).str.isdigit().all() and (non_null[0] != "0" or all(c == "0" for c in non_null))
+        is_numeric = non_null.str.replace('[,.]', '', regex=True).str.rstrip("-").str.isdigit().all() and (non_null[0] != "0" or all(c == "0" for c in non_null))
 
         if is_numeric:
             return 'number'
