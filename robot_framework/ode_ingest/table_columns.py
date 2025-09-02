@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """This contains a list of table columns to use for each table in the data set."""
 
 table_keys = {  # This table contains the keys used in the database to identify each entry.
