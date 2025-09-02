@@ -18,7 +18,7 @@ class DateRangeColumn:
     end_date: str
 
 
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes, too-many-branches, too-few-public-methods
 class CSVCleaner:
     """
     A class for consistent handling of CSV-files with data type conversion.
