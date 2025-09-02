@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import pandas as pd
 import numpy as np
@@ -189,7 +189,7 @@ class CSVCleaner:
 
             # Convert to format ddmmyyyy (as string)
             if converted:
-                df[col] = df[col].dt.strftime('%Y%m%d')
+                # df[col] = df[col].dt.strftime('%Y%m%d')  # Not used when putting actual dates in the database
                 df[col] = df[col].fillna(pd.NA)
 
         return df
@@ -246,61 +246,6 @@ class CSVCleaner:
 
         converted = series.apply(convert_danish_number)
         return converted
-
-    def analyze_csv(self, filepath: Path) -> Dict:
-        """Analyse the first 100 rows and return a dictionary of types.
-
-        Args:
-            filepath: Path to the file to analyze.
-        """
-        sample_df = None
-
-        for encoding in self.encodings:
-            try:
-                sample_df = pd.read_csv(filepath, dtype=str, encoding=encoding, nrows=1000, **self.csv_config)
-                break
-            except UnicodeDecodeError:
-                continue
-
-        if sample_df is None:
-            raise ValueError(f"Could not read {filepath} with any of these encodings: {self.encodings}")
-        sample_df = self._clean_basic_data(sample_df)
-
-        analysis = {
-            'total_columns': len(sample_df.columns),
-            'columns': list(sample_df.columns),
-            'suggested_types': {}
-        }
-
-        for col in sample_df.columns:
-
-            # Suggest data type
-            suggested_type = self._suggest_column_type(sample_df[col])
-            analysis['suggested_types'][col] = suggested_type
-
-        return analysis
-
-    def _suggest_column_type(self, series: pd.Series) -> str:
-        """Suggest data type (text, date or number) based on content."""
-
-        # Drop null values
-        non_null = series.dropna().astype(str)
-
-        if len(non_null) == 0:
-            return 'text'
-
-        # Check for dates
-        for pattern in self.date_patterns:
-            if non_null.str.match(pattern).all():
-                return 'date'
-
-        # Check for numbers: is a digit without leading zeroes, unless everything is zero
-        is_numeric = non_null.str.replace('[,.]', '', regex=True).str.rstrip("-").str.isdigit().all() and (non_null[0] != "0" or all(c == "0" for c in non_null))
-
-        if is_numeric:
-            return 'number'
-
-        return 'text'
 
     def _apply_date_filter(self, df: pd.DataFrame, date_filter: DateRangeColumn) -> pd.DataFrame:
         """Filter data frame based on date interval.

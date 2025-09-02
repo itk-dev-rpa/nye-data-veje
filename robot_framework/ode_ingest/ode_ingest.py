@@ -253,15 +253,16 @@ def create_table(table_name: str, columns: list[str], connection_string: str):
         if table_name in table_dict and table_dict[table_name]:
             columns.update(table_dict[table_name])
 
-    # type_mapping = {
-    #     'text': String(255),
-    #     'number': Numeric(precision=15, scale=2),
-    #     'date': Date
-    # }
-    # columns_list = []
-    # for col in table_used_columns[table_name]:
-    #     column_type = type_mapping[data_types[table_name][col]]
-    #     columns_list.append(Column(col, column_type))
+    type_mapping = {
+        'text': String(255),
+        'number': Numeric(precision=15, scale=2),
+        'date': Date
+    }
+    columns_list = []
+    for col in table_used_columns[table_name]:
+        column_type = type_mapping[data_types[table_name][col]]
+        columns_list.append(Column(col, column_type))
+
     columns_list = [Column(col, String(255)) for col in columns]
 
     if primary_keys:
