@@ -94,7 +94,7 @@ class CSVCleaner:
         # Try different encodings.
         for encoding in self.encodings:
             try:
-                df = pd.read_csv(filepath, dtype=str, encoding=encoding, **self.csv_config)
+                raw_df = pd.read_csv(filepath, dtype=str, encoding=encoding, **self.csv_config)
                 break
             except UnicodeDecodeError:
                 continue
@@ -102,12 +102,8 @@ class CSVCleaner:
         if df is None:
             raise ValueError(f"Could not read {filepath} with any of these encodings: {self.encodings}")
 
-        # Save clean data for comparison
-        if check_data:
-            raw_df = df.copy()
-
         # Clean data
-        df = self._clean_basic_data(df)
+        df = self._clean_basic_data(raw_df)
 
         # Check for missing key values
         if table_keys:
@@ -130,13 +126,17 @@ class CSVCleaner:
         # Convert empty strings to NULL
         df = df.replace(['', ' ', 'nan', 'NaN', np.nan], pd.NA).convert_dtypes()
 
-        # Check for null in key columns
+        # Check for missing key values
         if table_keys:
-            null_keys = pd.isnull(df[table_keys]).all(1)
-            null_df = df[null_keys]
-            if len(null_df) > 0:
-                oc.log_error(f"Missing keys from {filepath}:\n {null_df}")
-                df = df[~null_keys]
+            missing_mask = pd.Series(False, index=df.index)
+            for col in table_keys:
+                col_missing = df[col].apply(self._is_value_effectively_null)
+                if col_missing.any():
+                    missing_rows = df[col_missing].index.tolist()
+                    oc.log_error(f"File '{filepath}' missing key values in column '{col}' at rows: {missing_rows}")
+                missing_mask |= col_missing
+
+            df = df[~missing_mask]
 
         if check_data:
             self._compare_df_nulls(raw_df, df, df.columns.to_list())
@@ -149,7 +149,7 @@ class CSVCleaner:
         Args:
             df: Pandas dataframe in need of cleaning.
         """
-
+        df = df.copy()
         for col in df.columns:
             if df[col].dtype == 'object':
                 df[col] = df[col].astype(str).str.strip().replace(".", "")
