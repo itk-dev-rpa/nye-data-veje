@@ -76,7 +76,7 @@ class CSVCleaner:
                             date_columns: Optional[List[str]] = None,
                             number_columns: Optional[List[str]] = None,
                             date_filter: Optional[DateRangeColumn] = None,
-                            check_data: bool = False) -> pd.DataFrame:
+                            check_data: bool = True) -> pd.DataFrame:
         """
         Read CSV with automatic data type conversion.
 
@@ -89,7 +89,7 @@ class CSVCleaner:
             date_filter: (Optional) Dict with 'column', 'start_date', 'end_date' for filtering
             check_data: Should data conversion be checked for errors?
         """
-        df = None
+        raw_df = None
 
         # Try different encodings.
         for encoding in self.encodings:
@@ -99,11 +99,12 @@ class CSVCleaner:
             except UnicodeDecodeError:
                 continue
 
-        if df is None:
+        if raw_df is None:
             raise ValueError(f"Could not read {filepath} with any of these encodings: {self.encodings}")
 
         # Clean data
-        df = self._clean_basic_data(raw_df)
+        raw_df = self._clean_basic_data(raw_df)
+        df = raw_df.copy()
 
         # Check for missing key values
         if table_keys:
@@ -176,31 +177,16 @@ class CSVCleaner:
                 continue
 
             # Try reading with different formats.
-            converted = False
             for date_format in self.date_formats:
                 try:
                     new_col = pd.to_datetime(df[col], format=date_format, errors='coerce')
                     successful_conversions = new_col.notna().sum()
                     if successful_conversions:
-                        converted = True
                         df[col] = new_col
+                        df[col] = df[col].fillna(pd.NA)
                         break
                 except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
                     continue
-
-            if not converted:
-                # Pandas auto format as fallback.
-                try:
-                    df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
-                    converted = True
-                except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
-                    print(f"Could not convert {col} to date")
-
-            # Convert to format ddmmyyyy (as string)
-            if converted:
-                # df[col] = df[col].dt.strftime('%Y%m%d')  # Not used when putting actual dates in the database
-                df[col] = df[col].fillna(pd.NA)
-
         return df
 
     def _convert_numbers(self, df: pd.DataFrame, number_columns: List[str]) -> pd.DataFrame:

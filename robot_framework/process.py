@@ -54,8 +54,8 @@ if __name__ == "__main__":
     conn_string = os.getenv("OpenOrchestratorConnString")
     crypto_key = os.getenv("OpenOrchestratorKey")
     arguments = {
-        "create_table": True,
-        "insert_total_data": True,
+        "create_table": False,
+        "insert_total_data": False,
         "insert_delta_data": True,
         "from_to_date": None
     }
