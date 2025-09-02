@@ -2,6 +2,8 @@
 
 DB_SCHEMA = "ode"
 DB_NAME = "BackDataLake-Test"
+DB_CONNECTION = "NDV Connection String"
+DATA_DIRECTORY = "NDV File Directory"
 
 # Error screenshot config
 SMTP_SERVER = "smtp.adm.aarhuskommune.dk"

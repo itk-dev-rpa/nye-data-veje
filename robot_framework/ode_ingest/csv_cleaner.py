@@ -75,17 +75,20 @@ class CSVCleaner:
                             table_keys: Optional[List[str]] = None,
                             date_columns: Optional[List[str]] = None,
                             number_columns: Optional[List[str]] = None,
-                            date_filter: Optional[DateRangeColumn] = None) -> pd.DataFrame:
+                            date_filter: Optional[DateRangeColumn] = None,
+                            check_data: bool = False) -> pd.DataFrame:
         """
         Read CSV with automatic data type conversion.
 
         Args:
             filepath: Path for CSV-fil.
-            date_columns: List of columns to convert to dates.
-            number_columns: List of columns to convert to integers.
-            date_filter: Dict with 'column', 'start_date', 'end_date' for filtering
+            oc: OpenOrchestrator connection.
+            table_keys: (Optional) A list of table keys used for indexing.
+            date_columns: (Optional) List of columns to convert to dates.
+            number_columns: (Optional) List of columns to convert to integers.
+            date_filter: (Optional) Dict with 'column', 'start_date', 'end_date' for filtering
+            check_data: Should data conversion be checked for errors?
         """
-
         df = None
 
         # Try different encodings.
@@ -99,17 +102,20 @@ class CSVCleaner:
         if df is None:
             raise ValueError(f"Could not read {filepath} with any of these encodings: {self.encodings}")
 
+        # Save clean data for comparison
+        if check_data:
+            raw_df = df.copy()
+
         # Clean data
         df = self._clean_basic_data(df)
 
         # Check for missing key values
-        if not table_keys:
-            table_keys = []
-        for key_value in table_keys:
-            missing_keys = df[df[key_value].isna() | (df[key_value].str.strip() == '')]
-            if len(missing_keys) > 0:
-                oc.log_error(f"File '{filepath}' missing keys: {missing_keys.index.tolist()}")
-                df = df.dropna(subset=[key_value])
+        if table_keys:
+            for key_value in table_keys:
+                missing_keys = df[df[key_value].isna() | (df[key_value].str.strip() == '')]
+                if len(missing_keys) > 0:
+                    oc.log_error(f"File '{filepath}' missing keys: {missing_keys.index.tolist()}")
+                    df = df.dropna(subset=[key_value])
 
         # Convert data types
         if date_columns:
@@ -131,6 +137,9 @@ class CSVCleaner:
             if len(null_df) > 0:
                 oc.log_error(f"Missing keys from {filepath}:\n {null_df}")
                 df = df[~null_keys]
+
+        if check_data:
+            self._compare_df_nulls(raw_df, df, df.columns.to_list())
 
         return df
 
@@ -282,3 +291,24 @@ class CSVCleaner:
             print("Warning: No rows matched the date filter.")
 
         return filtered_df
+
+    def _compare_df_nulls(self, raw_df: pd.DataFrame, processed_df: pd.DataFrame, table_columns: list[str]):
+        for col in table_columns:
+            raw_missing = raw_df[col].apply(self._is_value_effectively_null)
+            proc_missing = processed_df[col].apply(self._is_value_effectively_null)
+
+            new_nulls = (~raw_missing) & proc_missing
+
+            if new_nulls.any():
+                raise BrokenPipeError(f"Col: {col}\nNye nulls: {len(raw_df[new_nulls])} at {raw_df[new_nulls].index}")
+
+    def _is_value_effectively_null(self, val):
+        if pd.isna(val):
+            return True
+        if isinstance(val, str):
+            val_lower = val.lower().strip()
+            if val_lower == 'nan':
+                return True
+            if len(val_lower) > 1 and val_lower.isdigit() and all(c == '0' for c in val_lower):
+                return True
+        return False

@@ -8,9 +8,10 @@ from sqlalchemy import create_engine
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 
 from robot_framework.ode_ingest import ode_ingest as ode
-from robot_framework.ode_ingest.table_columns import table_date_columns, table_used_columns, table_keys, data_types
+from robot_framework.ode_ingest.table_columns import table_date_columns, table_used_columns, table_keys
 from robot_framework.ode_ingest.csv_cleaner import DateRangeColumn
 from robot_framework.ode_ingest import file_sorting as sort
+from robot_framework import config
 
 
 def create_table(name: str, oc: OrchestratorConnection):
@@ -20,7 +21,7 @@ def create_table(name: str, oc: OrchestratorConnection):
         name: Name of table.
     """
 
-    connection_string = oc.get_constant("NDV Connection String").value
+    connection_string = oc.get_constant(config.DB_CONNECTION).value
     columns = set()
     for table_dict in [table_used_columns, table_date_columns, table_keys]:
         if name in table_dict and table_dict[name]:
@@ -37,8 +38,8 @@ def insert_total_data(table: str, oc: OrchestratorConnection, from_to_date: tupl
         from_to_date: Dates to and from, to read data from as a tuple. Used to insert a reduced dataset. Defaults to None.
     """
     oc.log_trace(f"Starting insert of table {table}")
-    file_directory = oc.get_constant("NDV File Directory").value
-    connection_string = oc.get_constant("NDV Connection String").value
+    file_directory = oc.get_constant(config.DATA_DIRECTORY).value
+    connection_string = oc.get_constant(config.DB_CONNECTION).value
 
     files = ode.find_files(file_directory, f"{table}_Total")
     engine = create_engine(connection_string, fast_executemany=True)
@@ -63,8 +64,8 @@ def insert_delta_data(delta_table: str, oc: OrchestratorConnection):
         from_file: Which file to start from. Defaults to 0.
     """
     oc.log_trace(f"Starting insert of table {delta_table}")
-    file_directory = oc.get_constant("NDV File Directory").value
-    connection_string = oc.get_constant("NDV Connection String").value
+    file_directory = oc.get_constant(config.DATA_DIRECTORY).value
+    connection_string = oc.get_constant(config.DB_CONNECTION).value
 
     files = ode.find_files(file_directory, f"{delta_table}_Delta")
     files = sort.sort_files(files)
