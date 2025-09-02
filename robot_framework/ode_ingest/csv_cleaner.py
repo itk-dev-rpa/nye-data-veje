@@ -293,6 +293,16 @@ class CSVCleaner:
         return filtered_df
 
     def _compare_df_nulls(self, raw_df: pd.DataFrame, processed_df: pd.DataFrame, table_columns: list[str]):
+        """Compare null values between two dataframes. If one has more than the other, throw an error.
+
+        Args:
+            raw_df: The original DataFrame.
+            processed_df: The processed DataFrame.
+            table_columns: List of columns to check.
+
+        Raises:
+            BrokenPipeError: An issue with identifying null values has occured.
+        """
         for col in table_columns:
             raw_missing = raw_df[col].apply(self._is_value_effectively_null)
             proc_missing = processed_df[col].apply(self._is_value_effectively_null)
@@ -302,7 +312,15 @@ class CSVCleaner:
             if new_nulls.any():
                 raise BrokenPipeError(f"Col: {col}\nNye nulls: {len(raw_df[new_nulls])} at {raw_df[new_nulls].index}")
 
-    def _is_value_effectively_null(self, val):
+    def _is_value_effectively_null(self, val: object):
+        """Check if value if effectively null. NONE, np.NA, "000" and others will be caught.
+
+        Args:
+            val: The object that might be null.
+
+        Returns:
+            True if the value is null.
+        """
         if pd.isna(val):
             return True
         if isinstance(val, str):
