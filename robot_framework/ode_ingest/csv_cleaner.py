@@ -134,7 +134,7 @@ class CSVCleaner:
             for col in table_keys:
                 if col in date_columns:  # Date columns can't be checked, inconsistent formatting.
                     continue
-                col_missing = df[col].apply(self._is_value_effectively_null)
+                col_missing = df[col].isna()
                 if col_missing.any():
                     missing_rows = df[col_missing].index.tolist()
                     oc.log_error(f"File '{filepath}' missing key values in column '{col}' at rows: {missing_rows}")
