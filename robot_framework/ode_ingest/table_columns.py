@@ -234,6 +234,7 @@ table_used_columns = {  # This table defines all the columns we actually use fro
         "Deltransaktion",
         "Firmakode",
         "Forretningspartner",
+        "Gentagelsesposition",
         "Henstand_til",
         "Hovedtransaktion",
         "Indholdsart",
@@ -598,6 +599,7 @@ Type mapping rules:
 
 data_types = {
     'Bilag-master': {
+        "Gentagelsesposition": 'text',
         'AfregnPeriode_fra': 'date',
         'AfregnPeriode_til': 'date',
         'Afskrivningsårsag': 'text',
@@ -705,6 +707,8 @@ data_types = {
     },
 
     'Bilag-lukket': {
+        "Intervalnummer": 'number',
+        "Recordnummer": 'number',
         'Afskrivningsårsag': 'text',
         'Afskrivningsdato': 'date',
         'Aftaleindhold': 'text',

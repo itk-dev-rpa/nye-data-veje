@@ -3,6 +3,7 @@
 from pathlib import Path
 from dataclasses import dataclass
 from typing import List, Optional
+from decimal import Decimal
 
 import pandas as pd
 import numpy as np
@@ -75,10 +76,9 @@ class CSVCleaner:
                             table_keys: Optional[List[str]] = None,
                             date_columns: Optional[List[str]] = None,
                             number_columns: Optional[List[str]] = None,
-                            date_filter: Optional[DateRangeColumn] = None,
-                            check_data: bool = True) -> pd.DataFrame:
+                            date_filter: Optional[DateRangeColumn] = None) -> pd.DataFrame:
         """
-        Read CSV with automatic data type conversion.
+        Read CSV with data type conversion.
 
         Args:
             filepath: Path for CSV-fil.
@@ -101,6 +101,8 @@ class CSVCleaner:
 
         if raw_df is None:
             raise ValueError(f"Could not read {filepath} with any of these encodings: {self.encodings}")
+        if raw_df.empty:
+            return raw_df
 
         # Clean data
         raw_df = self._clean_basic_data(raw_df)
@@ -126,11 +128,12 @@ class CSVCleaner:
 
         # Convert empty strings to NULL
         df = df.replace(['', ' ', 'nan', 'NaN', np.nan], pd.NA).convert_dtypes()
-
         # Check for missing key values
         if table_keys:
             missing_mask = pd.Series(False, index=df.index)
             for col in table_keys:
+                if col in date_columns:  # Date columns can't be checked, inconsistent formatting.
+                    continue
                 col_missing = df[col].apply(self._is_value_effectively_null)
                 if col_missing.any():
                     missing_rows = df[col_missing].index.tolist()
@@ -139,8 +142,8 @@ class CSVCleaner:
 
             df = df[~missing_mask]
 
-        if check_data:
-            self._compare_df_nulls(raw_df, df, df.columns.to_list())
+        if df.empty:
+            raise BrokenPipeError("Dataframe was cleared by null check.")
 
         return df
 
@@ -175,15 +178,15 @@ class CSVCleaner:
         for col in date_columns:
             if col not in df.columns:
                 continue
+            df[col] = df[col].replace('00.00.0000', pd.NaT)
 
             # Try reading with different formats.
             for date_format in self.date_formats:
                 try:
                     new_col = pd.to_datetime(df[col], format=date_format, errors='coerce')
                     successful_conversions = new_col.notna().sum()
-                    if successful_conversions:
+                    if successful_conversions > 0:
                         df[col] = new_col
-                        df[col] = df[col].fillna(pd.NA)
                         break
                 except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
                     continue
@@ -211,34 +214,35 @@ class CSVCleaner:
                 df[col] = self._safe_float_conversion(df[col])
             else:
                 df[col] = np.floor(pd.to_numeric(df[col].str.replace(".", ""), errors='coerce')).astype('Int64')
-
+            error_df = df[~df[col].apply(self._is_numeric)]
+            if not error_df.empty:
+                print(error_df)
             # Apply the mask to recreate the negatives
             df[col] = np.where(m_neg, -df[col], df[col])
+            # Store values as strings to avoid errors on upload
+            df[col] = df[col].astype(str)
 
         return df
 
     def _safe_float_conversion(self, series: pd.Series) -> pd.Series:
-        """Convert to float with danish seperator.
+        """Convert to decimal.Decimal from numbers that may use Danish separators.
 
         Args:
-            series: The pandas series to work on."""
-
+            series: A pandas series containing numbers to convert to danish formatted decimals.
+        """
         def convert_danish_number(value):
             if pd.isna(value) or value == '':
                 return None
-
             value_str = str(value).strip()
 
+            # Remove thousand separator and replace comma with dot
             if '.' in value_str and ',' in value_str:
                 value_str = value_str.replace('.', '').replace(',', '.')
             elif ',' in value_str:
                 value_str = value_str.replace(',', '.')
+            return Decimal(value_str).quantize(Decimal("0.01"))  # Match SQL NUMERIC(15,2)
 
-            try:
-                return float(value_str)
-            except (ValueError, TypeError):
-                return np.nan
-
+        # Convert series
         converted = series.apply(convert_danish_number)
         return converted
 
@@ -278,41 +282,6 @@ class CSVCleaner:
 
         return filtered_df
 
-    def _compare_df_nulls(self, raw_df: pd.DataFrame, processed_df: pd.DataFrame, table_columns: list[str]):
-        """Compare null values between two dataframes. If one has more than the other, throw an error.
-
-        Args:
-            raw_df: The original DataFrame.
-            processed_df: The processed DataFrame.
-            table_columns: List of columns to check.
-
-        Raises:
-            BrokenPipeError: An issue with identifying null values has occured.
-        """
-        for col in table_columns:
-            raw_missing = raw_df[col].apply(self._is_value_effectively_null)
-            proc_missing = processed_df[col].apply(self._is_value_effectively_null)
-
-            new_nulls = (~raw_missing) & proc_missing
-
-            if new_nulls.any():
-                raise BrokenPipeError(f"Col: {col}\nNye nulls: {len(raw_df[new_nulls])} at {raw_df[new_nulls].index}")
-
-    def _is_value_effectively_null(self, val: object):
-        """Check if value if effectively null. NONE, np.NA, "000" and others will be caught.
-
-        Args:
-            val: The object that might be null.
-
-        Returns:
-            True if the value is null.
-        """
-        if pd.isna(val):
-            return True
-        if isinstance(val, str):
-            val_lower = val.lower().strip()
-            if val_lower == 'nan':
-                return True
-            if len(val_lower) > 1 and val_lower.isdigit() and all(c == '0' for c in val_lower):
-                return True
-        return False
+    def _is_numeric(self, value) -> bool:
+        """Check if value is numeric, including Decimal."""
+        return isinstance(value, (int, float, Decimal)) and not pd.isna(value)
