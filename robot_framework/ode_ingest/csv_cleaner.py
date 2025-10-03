@@ -13,9 +13,7 @@ import pandas as pd
 import numpy as np
 
 from robot_framework import config
-from robot_framework.ode_ingest import data_cleaning
-from robot_framework.ode_ingest.utils import date_utils
-from robot_framework.ode_ingest.utils import number_utils
+from robot_framework.ode_ingest.utils import data_cleaning, date_utils, number_utils
 
 
 class CSVCleaner:

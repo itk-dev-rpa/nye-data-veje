@@ -7,7 +7,7 @@ Database utility functions for inserting, merging, and creating tables.
 import time
 from typing import List
 import pandas as pd
-from sqlalchemy import create_engine, text, Engine, Table, MetaData, PrimaryKeyConstraint, Column, String, Date, Numeric
+from sqlalchemy import create_engine, text, Engine, Table, MetaData, PrimaryKeyConstraint, Column, String, Date, Numeric, Integer
 from sqlalchemy.exc import SQLAlchemyError
 from robot_framework import config
 from robot_framework.ode_ingest.table_columns import table_keys, table_used_columns, data_types
@@ -15,7 +15,8 @@ from robot_framework.ode_ingest.table_columns import table_keys, table_used_colu
 type_mapping = {
     'text': String(255),
     'number': Numeric(precision=15, scale=2),
-    'date': Date
+    'date': Date,
+    'int': Integer
 }
 
 
