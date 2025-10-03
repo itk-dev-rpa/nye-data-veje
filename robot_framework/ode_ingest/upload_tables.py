@@ -7,10 +7,9 @@ import shutil
 from sqlalchemy import create_engine
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 
-from robot_framework.ode_ingest import ode_ingest as ode
 from robot_framework.ode_ingest.table_columns import table_date_columns
-from robot_framework.ode_ingest.csv_cleaner import DateRangeColumn
-from robot_framework.ode_ingest import file_sorting as sort
+from robot_framework.ode_ingest.utils.date_utils import DateRangeColumn
+from robot_framework.ode_ingest.utils import file_utils, dataframe_utils, db_utils
 from robot_framework import config
 
 
@@ -26,7 +25,7 @@ def insert_total_data(table: str, oc: OrchestratorConnection, from_to_date: tupl
     file_directory = oc.get_constant(config.DATA_DIRECTORY).value
     connection_string = oc.get_constant(config.DB_CONNECTION).value
 
-    files = ode.find_files(file_directory, f"{table}_Total")
+    files = file_utils.find_files(file_directory, f"{table}_Total")
     engine = create_engine(connection_string, fast_executemany=True)
 
     date_column = None
@@ -34,8 +33,8 @@ def insert_total_data(table: str, oc: OrchestratorConnection, from_to_date: tupl
         date_column = DateRangeColumn(table_date_columns.get(table), from_to_date[0], from_to_date[1])
     for i, file_path in enumerate(files):
         oc.log_trace(f"Inserting data from file {i+1}/{len(files)}: {file_path}")
-        df = ode.create_dataframe_from_file(file_path, table, oc, date_column)
-        ode.insert_data(df, table, engine)
+        df = dataframe_utils.create_dataframe_from_file(file_path, table, oc, date_column)
+        db_utils.insert_data(df, table, engine)
         directory, filename = path.split(file_path)
         shutil.move(file_path, path.join(directory, "processed_total_files", filename))
 
@@ -52,15 +51,15 @@ def insert_delta_data(delta_table: str, oc: OrchestratorConnection):
     file_directory = oc.get_constant(config.DATA_DIRECTORY).value
     connection_string = oc.get_constant(config.DB_CONNECTION).value
 
-    files = ode.find_files(file_directory, f"{delta_table}_Delta")
-    files = sort.sort_files(files)
+    files = file_utils.find_files(file_directory, f"{delta_table}_Delta")
+    files = file_utils.sort_files(files)
     engine = create_engine(connection_string, fast_executemany=True)
 
     for i, file_path in enumerate(files):
         oc.log_trace(f"Inserting data from file {i+1}/{len(files)}: {file_path}")
-        df = ode.create_dataframe_from_file(file_path, delta_table, oc)
+        df = dataframe_utils.create_dataframe_from_file(file_path, delta_table, oc)
         if len(df) > 0:
-            ode.merge_table_from_dataframe(df, delta_table, engine)
+            db_utils.merge_table_from_dataframe(df, delta_table, engine)
         else:
             oc.log_trace("No lines found in file")
         directory, filename = path.split(file_path)

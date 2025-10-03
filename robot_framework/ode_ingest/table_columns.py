@@ -21,7 +21,7 @@ table_keys = {  # This table contains the keys used in the database to identify 
     "UU-aftale":                    None,
 }
 
-table_date_columns = {  # This table contains the date columns, that are used to define when they were added.
+table_date_columns = {  # This table contains the date columns, that are used to define when they were added, for filtering on a date range.
     "BO-aftale-haendelse":          ["Afskrivnings_dato", "Betalingsdato"],
     "FP-aftale":                    "Oprettet_den",
     "Indbetalinger":                "Oprettet_den",
@@ -597,7 +597,7 @@ Type mapping rules:
 - INT1 -> 'number'
 """
 
-data_types = {
+data_types = {  # This table maps columns to datatypes, as defind in the KMD API docs.
     'Bilag-master': {
         "Gentagelsesposition": 'text',
         'AfregnPeriode_fra': 'date',
