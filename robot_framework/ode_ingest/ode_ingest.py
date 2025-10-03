@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, text, Engine, Table, Column, String, MetaData, PrimaryKeyConstraint, Date, Numeric
 from sqlalchemy.exc import SQLAlchemyError
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
@@ -15,6 +14,12 @@ from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConn
 from robot_framework import config
 from robot_framework.ode_ingest.csv_cleaner import CSVCleaner, DateRangeColumn
 from robot_framework.ode_ingest.table_columns import table_keys, table_used_columns, data_types
+
+type_mapping = {
+    'text': String(255),
+    'number': Numeric(precision=15, scale=2),
+    'date': Date
+}
 
 
 def find_files(directory: str, partial_name: str):
@@ -93,77 +98,6 @@ def create_dataframe_from_file(file_path: str, table_name: str, oc: Orchestrator
     return df
 
 
-def update_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine):
-    """Use sqalchemy to update table with new values.
-
-    Args:
-        df: Pandas data frame to update from.
-        table_name: SQL table to update to.
-        engine: SQL engine for connection.
-    """
-    key_columns = table_keys[table_name]
-    if not key_columns:
-        # There are no keys, just insert the whole table.
-        insert_data(df, table_name, engine)
-        return
-
-    df.set_index(key_columns, inplace=True)
-    session_maker = sessionmaker(bind=engine)
-    session = session_maker()
-    try:
-        inserted = 0
-        updated = 0
-        new_records = []
-        index_data = df.to_dict('index')
-        for record in index_data:  # Here we get the index keys as keys for a dictionary of columns as keys with values
-            index_values = [record] if isinstance(record, str) else list(record)
-            index_keys = dict(zip(key_columns, index_values))
-
-            where_conditions = []
-            where_params = {}
-            # Set where clause from record as values for keys
-            for index in index_keys:
-                where_conditions.append(f"[{index}] = :key_{index.replace('.', '')}")
-                where_params[f"key_{index}".replace(".", "")] = index_keys[index]
-            where_clause = " AND ".join(where_conditions)
-
-            # Build SET-clause for update (all columns except keys)
-            set_conditions = []
-            update_params = {}
-            for col in index_data[record]:  # Access specific dictionary of this index
-                set_conditions.append(f"[{col}] = :update_{col.replace('.', '')}")
-                update_params[f"update_{col}".replace(".", "")] = index_data[record][col]
-
-            set_clause = ", ".join(set_conditions)
-
-            # First attempt an update
-            update_table = f"[{config.DB_NAME}].[{config.DB_SCHEMA}].[{table_name}]"   # Fix for some table names containing "-" when using sqlalchemy
-            update_sql = f"UPDATE {update_table} SET {set_clause} WHERE {where_clause}"
-            all_params = {**where_params, **update_params}
-
-            results = session.execute(text(update_sql), all_params)
-            if results.rowcount == 0:
-                inserted += 1
-                values = {**index_keys, **index_data[record]}
-                new_records.append(values)
-            else:
-                updated += 1
-
-        new_records_df = pd.DataFrame(new_records)
-        if table_keys[table_name] is not None:
-            new_records_df.set_index(table_keys[table_name], inplace = True)
-        insert_data(new_records_df, table_name, engine)
-
-        session.commit()
-
-    except Exception as e:
-        print(e)
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
 def merge_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine):
     """Using SQL Server MERGE, upsert data in bulk.
 
@@ -183,7 +117,7 @@ def merge_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine
 
     # 1. Upload dataframe to temporary table
     metadata = MetaData(schema=config.DB_SCHEMA)
-    Table(temp_table, metadata, *[Column(col, String(255)) for col in list(df.columns)])
+    Table(temp_table, metadata, *get_column_list_with_types(table_name))
     metadata.create_all(engine)
 
     insert_data(df, temp_table, engine)
@@ -193,6 +127,7 @@ def merge_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine
     temp_table = f"[{config.DB_NAME}].[{config.DB_SCHEMA}].[{temp_table}]"
 
     # ON clause - match on primary keys
+    key_columns = table_keys[table_name]
     on_conditions = []
     for key in key_columns:
         on_conditions.append(f"target.[{key}] = source.[{key}]")
@@ -236,34 +171,17 @@ def merge_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine
         pass  # Temp tables are cleaned automatically
 
 
-def create_table(table_name: str, columns: list[str], connection_string: str):
+def create_table(table_name: str, columns_list: list[str], oc: OrchestratorConnection):
     """Create table in the SQL database with the table name and columns.
 
     Args:
         table_name: Table name for the table.
-        columns: Columns for the table.
     """
+    connection_string = oc.get_constant(config.DB_CONNECTION).value
     engine = create_engine(connection_string)
 
     metadata = MetaData(schema=config.DB_SCHEMA)
     primary_keys = table_keys[table_name] if table_name in table_keys else None
-
-    columns = set()
-    for table_dict in [table_used_columns, table_keys]:
-        if table_name in table_dict and table_dict[table_name]:
-            columns.update(table_dict[table_name])
-
-    type_mapping = {
-        'text': String(255),
-        'number': Numeric(precision=15, scale=2),
-        'date': Date
-    }
-    columns_list = []
-    for col in table_used_columns[table_name]:
-        column_type = type_mapping[data_types[table_name][col]]
-        columns_list.append(Column(col, column_type))
-
-    columns_list = [Column(col, String(255)) for col in columns]
 
     if primary_keys:
         primary_key_constraint = PrimaryKeyConstraint(*primary_keys)
@@ -272,3 +190,12 @@ def create_table(table_name: str, columns: list[str], connection_string: str):
     Table(table_name, metadata, *columns_list)
 
     metadata.create_all(engine)
+
+
+def get_column_list_with_types(table_name: str):
+    """Lookup types and return list of Columns for table."""
+    columns_list = []
+    for col in table_used_columns[table_name]:
+        column_type = type_mapping[data_types[table_name][col]]
+        columns_list.append(Column(col, column_type))
+    return columns_list

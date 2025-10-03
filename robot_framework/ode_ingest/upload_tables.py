@@ -8,25 +8,10 @@ from sqlalchemy import create_engine
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 
 from robot_framework.ode_ingest import ode_ingest as ode
-from robot_framework.ode_ingest.table_columns import table_date_columns, table_used_columns, table_keys
+from robot_framework.ode_ingest.table_columns import table_date_columns
 from robot_framework.ode_ingest.csv_cleaner import DateRangeColumn
 from robot_framework.ode_ingest import file_sorting as sort
 from robot_framework import config
-
-
-def create_table(name: str, oc: OrchestratorConnection):
-    """Create a new table with a name.
-
-    Args:
-        name: Name of table.
-    """
-
-    connection_string = oc.get_constant(config.DB_CONNECTION).value
-    columns = set()
-    for table_dict in [table_used_columns, table_date_columns, table_keys]:
-        if name in table_dict and table_dict[name]:
-            columns.update(table_dict[name])
-    ode.create_table(name, columns, connection_string)
 
 
 def insert_total_data(table: str, oc: OrchestratorConnection, from_to_date: tuple[str, str] | None = None):
