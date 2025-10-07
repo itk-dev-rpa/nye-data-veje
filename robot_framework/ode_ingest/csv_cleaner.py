@@ -31,7 +31,7 @@ def _validate_initial_keys(
         table_keys: List of column names that are required keys
         filepath: Path to file being processed (for logging)
         oc: OrchestratorConnection for error logging
- 
+
     Returns:
         DataFrame with rows containing missing keys removed
     """
