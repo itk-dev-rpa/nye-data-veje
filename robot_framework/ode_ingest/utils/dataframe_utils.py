@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 import pandas as pd
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
-from robot_framework.ode_ingest.csv_cleaner import CSVCleaner
+from robot_framework.ode_ingest import csv_cleaner
 from robot_framework.ode_ingest.table_columns import table_keys, table_used_columns, data_types
 from robot_framework.ode_ingest.utils.date_utils import DateRangeColumn
 
@@ -39,8 +39,7 @@ def create_dataframe_from_file(
     date_cols = [col for col, type_ in data_types[table_name].items() if type_ == 'date']
     num_cols = [col for col, type_ in data_types[table_name].items() if type_ == 'number']
 
-    cleaner = CSVCleaner()
-    df = cleaner.read_csv_with_types(
+    df = csv_cleaner.read_csv_with_types(
         csv_file,
         oc,
         table_keys=table_keys[table_name],

@@ -16,95 +16,127 @@ from robot_framework import config
 from robot_framework.ode_ingest.utils import data_cleaning, date_utils, number_utils
 
 
-class CSVCleaner:
+def _validate_initial_keys(
+    df: pd.DataFrame,
+    table_keys: List[str],
+    filepath: Path,
+    oc
+) -> pd.DataFrame:
     """
-    Class for reading, cleaning, and transforming CSV data.
-    Uses utility functions to handle Danish formats and
-    supports validation, conversion, and filtering.
+    Validate that key columns have no missing or empty values.
+    Logs errors and drops rows with missing keys.
+
+    Args:
+        df: DataFrame to validate
+        table_keys: List of column names that are required keys
+        filepath: Path to file being processed (for logging)
+        oc: OrchestratorConnection for error logging
+ 
+    Returns:
+        DataFrame with rows containing missing keys removed
     """
+    for key_value in table_keys:
+        missing_keys = df[df[key_value].isna() | (df[key_value].str.strip() == '')]
+        if len(missing_keys) > 0:
+            oc.log_error(f"File '{filepath}' missing keys: {missing_keys.index.tolist()}")
+            df = df.dropna(subset=[key_value])
+    return df
 
-    def __init__(self, encodings: Optional[List[str]] = None):
-        """
-        Initialize CSVCleaner with configuration parameters.
 
-        Args:
-            encodings: Optional list of text encodings to try when reading files.
-        """
-        self.csv_config = config.CSV_CONFIG
-        self.encodings = encodings or config.ENCODINGS
+def _validate_final_keys(
+    df: pd.DataFrame,
+    table_keys: List[str],
+    date_columns: Optional[List[str]],
+    filepath: Path,
+    oc
+) -> pd.DataFrame:
+    """
+    Final validation of key columns after type conversion.
+    Skips date columns and logs/removes rows with missing keys.
 
-    def read_csv_with_types(
-        self,
-        filepath: Path,
-        oc,  # OrchestratorConnection
-        table_keys: Optional[List[str]] = None,
-        date_columns: Optional[List[str]] = None,
-        number_columns: Optional[List[str]] = None,
-        date_filter: Optional[dict] = None
-    ) -> pd.DataFrame:
-        """
-        Reads a CSV file, cleans and converts the data, validates keys, and filters by date.
+    Args:
+        df: DataFrame to validate
+        table_keys: List of column names that are required keys
+        date_columns: List of date columns to skip in validation
+        filepath: Path to file being processed (for logging)
+        oc: OrchestratorConnection for error logging
 
-        Args:
-            filepath: Path to the CSV file.
-            oc: OrchestratorConnection for error logging.
-            table_keys: List of column names to use as keys (should not be empty).
-            date_columns: List of column names to convert to dates.
-            number_columns: List of column names to convert to numbers.
-            date_filter: Dict with keys 'column', 'start_date', 'end_date' for date filtering.
+    Returns:
+        DataFrame with invalid rows removed
+    """
+    missing_mask = pd.Series(False, index=df.index)
+    for col in table_keys:
+        if date_columns and col in date_columns:
+            continue
+        col_missing = df[col].isna()
+        if col_missing.any():
+            missing_rows = df[col_missing].index.tolist()
+            oc.log_error(
+                f"File '{filepath}' missing key values in column '{col}' at rows: {missing_rows}"
+            )
+        missing_mask |= col_missing
+    return df[~missing_mask]
 
-        Returns:
-            DataFrame with cleaned and validated data.
-        """
-        # 1. Read CSV
-        raw_df = None
-        for encoding in self.encodings:
-            try:
-                raw_df = pd.read_csv(filepath, dtype=str, encoding=encoding, **self.csv_config)
-                break
-            except UnicodeDecodeError:
-                continue
-        if raw_df is None:
-            raise ValueError(f"Could not read {filepath} with encodings: {self.encodings}")
-        if raw_df.empty:
-            return raw_df
 
-        # 2. Basic cleaning
-        df = data_cleaning.clean_basic_data(raw_df)
+def read_csv_with_types(
+    filepath: Path,
+    oc,  # OrchestratorConnection
+    *,
+    table_keys: Optional[List[str]] = None,
+    date_columns: Optional[List[str]] = None,
+    number_columns: Optional[List[str]] = None,
+    date_filter: Optional[dict] = None
+) -> pd.DataFrame:
+    """
+    Reads a CSV file, cleans and converts the data, validates keys, and filters by date.
 
-        # 3. Check for missing key values
-        if table_keys:
-            for key_value in table_keys:
-                missing_keys = df[df[key_value].isna() | (df[key_value].str.strip() == '')]
-                if len(missing_keys) > 0:
-                    oc.log_error(f"File '{filepath}' missing keys: {missing_keys.index.tolist()}")
-                    df = df.dropna(subset=[key_value])
+    Args:
+        filepath: Path to the CSV file.
+        oc: OrchestratorConnection for error logging.
+        table_keys: List of column names to use as keys (should not be empty).
+        date_columns: List of column names to convert to dates.
+        number_columns: List of column names to convert to numbers.
+        date_filter: Dict with keys 'column', 'start_date', 'end_date' for date filtering.
 
-        # 4. Date and number conversion
-        if date_columns:
-            df = date_utils.convert_dates(df, date_columns)
-        if number_columns:
-            df = number_utils.convert_numbers(df, number_columns)
+    Returns:
+        DataFrame with cleaned and validated data.
+    """
+    # 1. Read CSV
+    raw_df = None
+    for encoding in config.ENCODINGS:
+        try:
+            raw_df = pd.read_csv(filepath, dtype=str, encoding=encoding, **config.CSV_CONFIG)
+            break
+        except UnicodeDecodeError:
+            continue
+    if raw_df is None:
+        raise ValueError(f"Could not read {filepath} with encodings: {config.ENCODINGS}")
+    if raw_df.empty:
+        return raw_df
 
-        # 5. Date filtering
-        if date_filter:
-            df = date_utils.apply_date_filter(df, date_filter)
+    # 2. Basic cleaning
+    df = data_cleaning.clean_basic_data(raw_df)
 
-        # 6. Set empty strings to NULL and check missing keys again
-        df = df.replace(['', ' ', 'nan', 'NaN', np.nan], pd.NA).convert_dtypes()
-        if table_keys:
-            missing_mask = pd.Series(False, index=df.index)
-            for col in table_keys:
-                if date_columns and col in date_columns:
-                    continue
-                col_missing = df[col].isna()
-                if col_missing.any():
-                    missing_rows = df[col_missing].index.tolist()
-                    oc.log_error(f"File '{filepath}' missing key values in column '{col}' at rows: {missing_rows}")
-                missing_mask |= col_missing
-            df = df[~missing_mask]
+    # 3. Initial key validation
+    if table_keys:
+        df = _validate_initial_keys(df, table_keys, filepath, oc)
 
-        if df.empty:
-            raise BrokenPipeError("Dataframe was cleared by null check.")
+    # 4. Date and number conversion
+    if date_columns:
+        df = date_utils.convert_dates(df, date_columns)
+    if number_columns:
+        df = number_utils.convert_numbers(df, number_columns)
 
-        return df
+    # 5. Date filtering
+    if date_filter:
+        df = date_utils.apply_date_filter(df, date_filter)
+
+    # 6. Set empty strings to NULL and final key validation
+    df = df.replace(['', ' ', 'nan', 'NaN', np.nan], pd.NA).convert_dtypes()
+    if table_keys:
+        df = _validate_final_keys(df, table_keys, date_columns, filepath, oc)
+
+    if df.empty:
+        raise BrokenPipeError("Dataframe was cleared by null check.")
+
+    return df
