@@ -1,9 +1,30 @@
-"""Contains functions for sorting CSV files by date and sequence number, ensuring correct processing."""
+"""
+file_utils.py
 
+File system utility functions for finding and handling files.
+"""
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Optional
+from datetime import datetime
+
+
+def find_files(directory: str, partial_name: str) -> List[str]:
+    """
+    Return files from a directory whose names contain a given partial string.
+
+    Args:
+        directory: Directory of files to look for.
+        partial_name: Partial filename, e.g., "BO-aaben", "Bilag-master_Total".
+
+    Returns:
+        List of file paths from the directory matching the partial name.
+    """
+    files = []
+    for filename in Path(directory).iterdir():
+        if partial_name in filename.name:
+            files.append(str(filename))
+    return files
 
 
 def _extract_date_from_filename(filename: str) -> Optional[datetime]:

@@ -5,7 +5,7 @@ import os
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 
 from robot_framework.ode_ingest import upload_tables
-from robot_framework.ode_ingest import ode_ingest
+from robot_framework.ode_ingest.utils import db_utils
 
 
 tables = [  # List of tables to work on
@@ -42,7 +42,7 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
     for table in tables:
         if create_table:
             orchestrator_connection.log_trace(f"Create table for {table}")
-            ode_ingest.create_table(table, ode_ingest.get_column_list_with_types(table), orchestrator_connection)
+            db_utils.create_table(table, db_utils.get_column_list_with_types(table), orchestrator_connection)
         if insert_total_data:
             orchestrator_connection.log_trace(f"Inserting total data for {table}")
             upload_tables.insert_total_data(table, orchestrator_connection, from_to_date=from_to_date)
