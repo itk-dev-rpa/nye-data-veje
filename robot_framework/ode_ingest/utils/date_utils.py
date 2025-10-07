@@ -37,7 +37,7 @@ def convert_dates(df: pd.DataFrame, date_columns: List[str]) -> pd.DataFrame:
     for col in date_columns:
         if col not in df.columns:
             continue
-        df[col] = df[col].replace('00.00.0000', pd.NaT)
+        df[col] = df[col].replace(['00.00.0000', '00000000'], None)
         for date_format in DATE_FORMATS:
             try:
                 new_col = pd.to_datetime(df[col], format=date_format, errors='coerce')

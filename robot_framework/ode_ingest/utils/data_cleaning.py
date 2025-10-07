@@ -23,9 +23,6 @@ def clean_basic_data(df: pd.DataFrame) -> pd.DataFrame:
         A copy of the DataFrame with the above changes applied.
     """
     df = df.copy()
-    for col in df.columns:
-        if df[col].dtype == "object":
-            df[col] = df[col].astype(str).str.strip().replace(".", "")
     unnamed_cols = df.columns[df.columns.str.contains('^Unnamed', case=False, na=False)]
     if len(unnamed_cols) > 0:
         df = df.drop(columns=unnamed_cols)
