@@ -7,7 +7,7 @@ table_keys = {  # This table contains the keys used in the database to identify 
     "BO-aftale":                    ["Aftalenummer", "Bilagsnummer", "Position"],
     "Bilag-lukket":                 ["Dato-ID", "Identifikation", "Intervalnummer", "Recordnummer"],
     "Bilag-master":                 ["Bilagsnummer", "Gentagelsesposition", "Position", "Delposition"],
-    "Forretningspartner":           ["Klient", "Forretningspartner", "Identifikationsart", "Forretningspartner-GUID"],  # These were removed as they often contain CPRs: "Identifikationsnr.", 
+    "Forretningspartner":           ["Klient", "Forretningspartner", "Identifikationsart", "Forretningspartner-GUID"],  # These were removed as they often contain CPRs: "Identifikationsnr.",
     "Indbetalinger":                ["Art_kilde", "Betalingsidentifikator", "Løbenummer"],
     "Opsaetning-Aftalekontotype":   ["Klient", "Sprognøgle", "Aftalekontotype"],
     "Opsaetning-Rykkerniveau":      ["Sprognøgle", "Rykkeprocedure", "Rykkeniveau"],
