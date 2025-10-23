@@ -20,7 +20,8 @@ dependencies = [
     "Pillow == 9.5.0",
     "pandas == 2.*",
     "sqlalchemy == 2.*",
-    "pyodbc == 5.*"
+    "pyodbc == 5.*",
+    "pyarrow == 20.*"
 ]
 [project.optional-dependencies]
 dev = [

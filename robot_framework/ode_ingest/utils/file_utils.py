@@ -5,6 +5,8 @@ File system utility functions for finding and handling files.
 """
 import re
 from pathlib import Path
+from os import path
+import shutil
 from typing import List, Tuple, Optional
 from datetime import datetime
 
@@ -102,3 +104,8 @@ def sort_files(file_paths: List[str]) -> List[str]:
         Sorted list, with oldest files first.
     """
     return sorted(file_paths, key=get_file_sort_key)
+
+
+def move_processed_files(filepath: Path, processed_path: str = "processed_files"):
+    directory, filename = path.split(filepath)
+    shutil.move(filepath, path.join(directory, processed_path, filename))

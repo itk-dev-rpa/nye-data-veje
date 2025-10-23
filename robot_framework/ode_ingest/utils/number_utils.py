@@ -7,7 +7,6 @@ including handling Danish decimal separators and checking if values are numeric.
 from decimal import Decimal
 
 import pandas as pd
-import numpy as np
 
 
 def safe_float_conversion(series: pd.Series) -> pd.Series:
@@ -48,13 +47,33 @@ def convert_numbers(df: pd.DataFrame, number_columns: list) -> pd.DataFrame:
     for col in number_columns:
         if col not in df.columns:
             continue
-        m_neg = df[col].str.endswith("-")
-        df[col] = df[col].str.rstrip("-")
-        has_decimals = df[col].astype(str).str.contains(',', na=False).any()
-        if has_decimals:
-            df[col] = safe_float_conversion(df[col])
-        else:
-            df[col] = np.floor(pd.to_numeric(df[col].str.replace(".", ""), errors='coerce')).astype('Int64')
-        df[col] = np.where(m_neg, -df[col], df[col])
-        df[col] = df[col].astype(str)
+        df[col] = convert_number_series(df[col]).astype(str)
     return df
+
+
+def convert_number_series(series: pd.Series) -> pd.Series:
+    """
+    Convert a series containing strings to numbers, using trailing minus
+    to properly set number as negative.
+    """
+    # Handle negatives
+    m_neg = series.str.endswith("-", na=False)
+    series_cleaned = series.str.rstrip("-")
+
+    # Detect format
+    has_decimals = series_cleaned.astype(str).str.contains(',', na=False).any()
+
+    if has_decimals:
+        converted = safe_float_conversion(series_cleaned)
+    else:
+        # Remove thousand separators, convert to integer
+        converted = pd.to_numeric(
+            series_cleaned.str.replace(".", "", regex=False), 
+            errors='coerce'
+        )
+        converted = converted.astype('Int64')  # Nullable integer
+
+    # Apply negative sign
+    result = converted.where(~m_neg, -converted)
+
+    return result

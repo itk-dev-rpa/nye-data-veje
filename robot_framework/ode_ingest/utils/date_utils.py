@@ -37,16 +37,28 @@ def convert_dates(df: pd.DataFrame, date_columns: List[str]) -> pd.DataFrame:
     for col in date_columns:
         if col not in df.columns:
             continue
-        df[col] = df[col].replace(['00.00.0000', '00000000'], None)
-        for date_format in DATE_FORMATS:
-            try:
-                new_col = pd.to_datetime(df[col], format=date_format, errors='coerce')
-                if new_col.notna().sum() > 0:
-                    df[col] = new_col
-                    break
-            except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
-                continue
+        df[col] = convert_date_series(df[col])
     return df
+
+
+def convert_date_series(series: pd.Series) -> pd.Series:
+    """Convert a series to date formats.
+
+    Args:
+        series: A series containing strings that should be formatted to dates.
+
+    Returns:
+        A series with dates and NaT.
+    """
+    series = series.replace(['00.00.0000', '00000000'], None)
+    for date_format in DATE_FORMATS:
+        try:
+            converted_dates = pd.to_datetime(series, format=date_format, errors='coerce')
+            if converted_dates.notna().sum() > 0:
+                return converted_dates
+        except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
+            continue
+    return series
 
 
 def apply_date_filter(df: pd.DataFrame, date_filter: dict) -> pd.DataFrame:

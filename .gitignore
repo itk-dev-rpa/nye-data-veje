@@ -163,5 +163,7 @@ dmypy.json
 # Custom
 NOTES.md
 docs/
+data_profiles
+sql_transforms/
 
 .vscode/

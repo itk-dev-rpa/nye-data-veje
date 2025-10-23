@@ -36,7 +36,7 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
     process_arguments = json.loads(orchestrator_connection.process_arguments)
     create_table = process_arguments["create_table"]
     insert_total_data = process_arguments["insert_total_data"]
-    insert_delta_data = process_arguments["insert_delta_data"]
+    update_total_from_delta = process_arguments["update_total_from_delta"]
     from_to_date = process_arguments["from_to_date"]
 
     for table in tables:
@@ -46,9 +46,9 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
         if insert_total_data:
             orchestrator_connection.log_trace(f"Inserting total data for {table}")
             upload_tables.insert_total_data(table, orchestrator_connection, from_to_date=from_to_date)
-        if insert_delta_data:
+        if update_total_from_delta:
             orchestrator_connection.log_trace(f"Inserting delta data for {table}")
-            upload_tables.insert_delta_data(table, orchestrator_connection)
+            upload_tables.update_total_from_delta(table, orchestrator_connection)
 
 
 if __name__ == "__main__":
@@ -57,6 +57,7 @@ if __name__ == "__main__":
     arguments = {
         "create_table": True,
         "insert_total_data": True,
+        "update_total_from_delta": False,
         "insert_delta_data": True,
         "from_to_date": None
     }

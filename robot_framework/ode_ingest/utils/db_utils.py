@@ -129,6 +129,6 @@ def get_column_list_with_types(table_name: str) -> List[Column]:
     """
     columns_list = []
     for col in table_used_columns[table_name]:
-        column_type = type_mapping[data_types[table_name][col]]
+        column_type = data_types[table_name][col]
         columns_list.append(Column(col, column_type))
     return columns_list

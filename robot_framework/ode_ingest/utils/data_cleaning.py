@@ -11,10 +11,9 @@ import pandas as pd
 def clean_basic_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Performs basic cleaning on a DataFrame:
-    - Strips leading and trailing whitespace from string columns.
-    - Removes periods from string columns.
     - Drops 'unnamed' columns (commonly from Excel exports).
     - Standardizes column names by replacing spaces with underscores and stripping whitespace.
+    - Make column names unique.
 
     Args:
         df: The DataFrame to clean.
@@ -27,4 +26,26 @@ def clean_basic_data(df: pd.DataFrame) -> pd.DataFrame:
     if len(unnamed_cols) > 0:
         df = df.drop(columns=unnamed_cols)
     df.columns = df.columns.str.replace(' ', '_').str.strip()
+    df.columns = make_columns_unique(df.columns)
     return df
+
+
+def make_columns_unique(cols):
+    """Run through columns and assign extra numbers to any duplicates.
+
+    Args:
+        cols: List of columns from a pandas dataframe.
+
+    Returns:
+        List of columns with numbers added to duplicates.
+    """
+    seen = {}
+    result = []
+    for col in cols:
+        if col not in seen:
+            seen[col] = 1
+            result.append(col)
+        else:
+            seen[col] += 1
+            result.append(f"{col}.{seen[col]}")
+    return result

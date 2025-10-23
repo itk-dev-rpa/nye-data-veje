@@ -39,7 +39,7 @@ def insert_total_data(table: str, oc: OrchestratorConnection, from_to_date: tupl
         shutil.move(file_path, path.join(directory, "processed_total_files", filename))
 
 
-def insert_delta_data(delta_table: str, oc: OrchestratorConnection):
+def update_total_from_delta(delta_table: str, oc: OrchestratorConnection):
     """Add data from new delta files and move them to a folder of processed files.
 
     Args:
