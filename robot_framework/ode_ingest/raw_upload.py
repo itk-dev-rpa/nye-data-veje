@@ -78,7 +78,7 @@ def upload_files(directory: str, table_name: str, subset: str, connection_string
             print(f"Completed in {time.time()-start} seconds.")
         # Sometimes, a column has changed name and does not match the expected schema. This catches this error.
         except KeyError as e:
-            oc.log_error(f"{filepath} error: {e.with_traceback()}")
+            oc.log_error(f"{filepath} error: {e}")
             print(f"ERROR: {e.with_traceback()}")
             file_utils.move_processed_files(filepath, 'KeyError')
 

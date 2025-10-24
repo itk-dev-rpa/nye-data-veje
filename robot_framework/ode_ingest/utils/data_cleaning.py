@@ -25,7 +25,7 @@ def clean_basic_data(df: pd.DataFrame) -> pd.DataFrame:
     unnamed_cols = df.columns[df.columns.str.contains('^Unnamed', case=False, na=False)]
     if len(unnamed_cols) > 0:
         df = df.drop(columns=unnamed_cols)
-    df.columns = df.columns.str.replace(' ', '_').str.strip()
+    df.columns = df.columns.str.replace(' ', '_').str.replace('.', '').str.strip()
     df.columns = make_columns_unique(df.columns)
     return df
 
@@ -47,5 +47,5 @@ def make_columns_unique(cols):
             result.append(col)
         else:
             seen[col] += 1
-            result.append(f"{col}.{seen[col]}")
+            result.append(f"{col}_{seen[col]}")
     return result
