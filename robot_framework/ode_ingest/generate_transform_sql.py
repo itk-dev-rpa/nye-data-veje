@@ -81,7 +81,8 @@ def generate_create_table_sql(table_name: str, schema_dict: dict,
     if primary_keys:
         pk_cols = ', '.join([f'[{pk}]' for pk in primary_keys])
         pk_constraint = f",\n    CONSTRAINT [PK_{table_name}_Typed] PRIMARY KEY CLUSTERED ({pk_cols})"
-
+# TODO: Don't drop table if it already exists, append data instead
+    # TODO: Target table name should be configurable, not just Typed (Backup, Typed, Combi)
     return f"""
 IF OBJECT_ID('[{schema}].[{table_name}_Typed]', 'U') IS NOT NULL
     DROP TABLE [{schema}].[{table_name}_Typed];
@@ -106,7 +107,7 @@ def generate_insert_sql(table_name: str, schema_dict: dict,
     if primary_keys:
         pk_partition = ', '.join([f'[{pk}]' for pk in primary_keys])
         pk_null_check = ' AND '.join([f'[{pk}] IS NOT NULL' for pk in primary_keys])
-
+# TODO: From table should be staging
         return f"""
 -- Report rows with NULL in primary key columns (will be excluded)
 SELECT
@@ -153,7 +154,7 @@ SELECT
 {',\n'.join(conversions)}
 FROM [{schema}].[{table_name}];
 """
-
+# TODO: Insert into should not just be Typed, but a configurable target table
 
 def generate_transform_script(table: str, suffix: str, schema_dict: dict,
                               primary_keys: list, output_dir: Path,
@@ -170,6 +171,7 @@ def generate_transform_script(table: str, suffix: str, schema_dict: dict,
         pk_select = ", '|', ".join([f'[{pk}]' for pk in primary_keys])
         if len(primary_keys) > 1:
             pk_select = f"CONCAT({pk_select})"
+# TODO: Rework verification, especially table names
         verification_queries = f"""
 -- ============================================================
 -- VERIFICATION RESULTS
@@ -261,7 +263,9 @@ def generate_all_transform_scripts(tables: list[str], data_types: dict,
 
         key_info = "No PK" if not keys else f"PK: {', '.join(keys)}"
 
-        for suffix in ["Total"]:
+        for suffix in ["Delta", "Total"]:
+            if suffix == "Delta":
+                keys = None
             print(f"Generating script for {table}_{suffix}...")
             script_file = generate_transform_script(
                 table, suffix, schema, keys or [], output_dir, config.DB_SCHEMA
