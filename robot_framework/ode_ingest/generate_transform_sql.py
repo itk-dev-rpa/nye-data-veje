@@ -1,7 +1,8 @@
 """
 generate_transform_sql.py
 
-Generate SQL scripts for transforming raw tables to typed tables with primary keys.
+Generate SQL scripts for transforming raw tables through the pipeline:
+Staging -> Backup (Raw) -> Typed (History) -> Snapshot (Current State)
 """
 from pathlib import Path
 from sqlalchemy import Integer, Date, DateTime, Numeric, String
@@ -33,7 +34,6 @@ def get_sql_type_string(sa_type) -> str:
 
 def generate_column_conversion(col_name: str, sa_type, source_col: str = None) -> str:
     """Generate SQL conversion expression for a column - inline for performance."""
-    # Keep existing implementation unchanged
     if source_col is None:
         source_col = col_name
 
@@ -45,20 +45,20 @@ def generate_column_conversion(col_name: str, sa_type, source_col: str = None) -
 
     if type_name in ('Date', 'DateTime'):
         return f"""    CASE
-        WHEN [{source_col}] IN ('00000000', '00.00.0000', '', '0', '0000-00-00') THEN NULL
-        WHEN LEN([{source_col}]) = 8 AND [{source_col}] NOT LIKE '%[^0-9]%' THEN TRY_CONVERT(DATE, [{source_col}], 112)
-        WHEN [{source_col}] LIKE '__[./]__[./]____' THEN TRY_CONVERT(DATE, [{source_col}], 104)
-        ELSE TRY_CONVERT(DATE, [{source_col}], 23)
-    END AS [{col_name}]"""
+            WHEN [{source_col}] IN ('00000000', '00.00.0000', '', '0', '0000-00-00') THEN NULL
+            WHEN LEN([{source_col}]) = 8 AND [{source_col}] NOT LIKE '%[^0-9]%' THEN TRY_CONVERT(DATE, [{source_col}], 112)
+            WHEN [{source_col}] LIKE '__[./]__[./]____' THEN TRY_CONVERT(DATE, [{source_col}], 104)
+            ELSE TRY_CONVERT(DATE, [{source_col}], 23)
+        END AS [{col_name}]"""
 
     if type_name == 'Numeric':
         return f"""    CASE
-        WHEN [{source_col}] IS NULL OR [{source_col}] = '' OR [{source_col}] = '0' THEN NULL
-        WHEN [{source_col}] LIKE '%-' THEN
-            TRY_CAST(REPLACE(REPLACE(LEFT([{source_col}], LEN([{source_col}])-1), '.', ''), ',', '.') AS DECIMAL(18,2)) * -1
-        ELSE
-            TRY_CAST(REPLACE(REPLACE([{source_col}], '.', ''), ',', '.') AS DECIMAL(18,2))
-    END AS [{col_name}]"""
+            WHEN [{source_col}] IS NULL OR [{source_col}] = '' OR [{source_col}] = '0' THEN NULL
+            WHEN [{source_col}] LIKE '%-' THEN
+                TRY_CAST(REPLACE(REPLACE(LEFT([{source_col}], LEN([{source_col}])-1), '.', ''), ',', '.') AS DECIMAL(18,2)) * -1
+            ELSE
+                TRY_CAST(REPLACE(REPLACE([{source_col}], '.', ''), ',', '.') AS DECIMAL(18,2))
+        END AS [{col_name}]"""
 
     if type_name == 'String':
         return f"""    LTRIM(RTRIM([{source_col}])) AS [{col_name}]"""
@@ -66,214 +66,247 @@ def generate_column_conversion(col_name: str, sa_type, source_col: str = None) -
     return f"    [{source_col}] AS [{col_name}]"
 
 
-def generate_create_table_sql(target_table: str, schema_dict: dict,
+def generate_create_table_sql(table_name: str, schema_dict: dict,
                               primary_keys: list, schema: str,
-                              drop_if_exists: bool = True) -> str:
-    """Generate CREATE TABLE statement with primary key."""
-
+                              table_type: str = "typed") -> str:
+    """
+    Generate CREATE TABLE statement.
+    table_type: 'backup' (all NVARCHAR), 'typed' (Correct types), 'snapshot' (Correct types + PK)
+    """
     columns = []
     for col_name, col_type in schema_dict.items():
-        sql_type = get_sql_type_string(col_type)
-        # Primary key columns must be NOT NULL
-        nullable = "NOT NULL" if primary_keys and col_name in primary_keys else "NULL"
+        if table_type == "backup":
+            sql_type = "NVARCHAR(MAX)"
+            nullable = "NULL"
+        else:
+            sql_type = get_sql_type_string(col_type)
+            # Primary key columns must be NOT NULL only for Snapshot
+            if table_type == "snapshot" and primary_keys and col_name in primary_keys:
+                nullable = "NOT NULL"
+            else:
+                nullable = "NULL"
+
         columns.append(f"    [{col_name}] {sql_type} {nullable}")
 
-    # Add primary key constraint
+    # Add primary key constraint only for Snapshot
     pk_constraint = ""
-    if primary_keys:
+    if table_type == "snapshot" and primary_keys:
         pk_cols = ', '.join([f'[{pk}]' for pk in primary_keys])
-        pk_constraint = f",\n    CONSTRAINT [PK_{target_table}] PRIMARY KEY CLUSTERED ({pk_cols})"
+        pk_constraint = f",\n    CONSTRAINT [PK_{table_name}] PRIMARY KEY CLUSTERED ({pk_cols})"
 
-    drop_statement = ""
-    if drop_if_exists:
-        drop_statement = f"""IF OBJECT_ID('[{schema}].[{target_table}]', 'U') IS NOT NULL
-    DROP TABLE [{schema}].[{target_table}];
-
-"""
-
-    return f"""{drop_statement}CREATE TABLE [{schema}].[{target_table}] (
-{',\n'.join(columns)}{pk_constraint}
-);
-"""
-
-
-def generate_insert_sql(source_table: str, target_table: str, schema_dict: dict,
-                        primary_keys: list, schema: str,
-                        apply_transformations: bool = True,
-                        merge_mode: bool = False) -> str:
-    """
-    Generate INSERT or MERGE statement with optional transformations.
-
-    Args:
-        source_table: Source table name
-        target_table: Target table name
-        schema_dict: Column definitions
-        primary_keys: List of primary key columns
-        schema: Database schema
-        apply_transformations: If True, apply type conversions (for Typed). If False, copy raw (for Backup)
-        merge_mode: If True, use MERGE for upsert. If False, use INSERT
+    # Use IF NOT EXISTS to allow appending to existing Backup/Typed tables
+    return f"""
+    IF OBJECT_ID('[{schema}].[{table_name}]', 'U') IS NULL
+    BEGIN
+        CREATE TABLE [{schema}].[{table_name}] (
+    {',\n'.join(columns)}{pk_constraint}
+        );
+    END
     """
 
+
+def generate_backup_insert_sql(source_table: str, target_table: str,
+                               schema_dict: dict, schema: str) -> str:
+    """Generate INSERT for Backup (Raw Copy)."""
     column_names = list(schema_dict.keys())
-
-    if apply_transformations:
-        # Apply transformations for Typed database
-        conversions = []
-        for col_name, col_type in schema_dict.items():
-            conversions.append(generate_column_conversion(col_name, col_type))
-    else:
-        # Raw copy for Backup database
-        conversions = [f"    [{col}]" for col in column_names]
-
     columns_clause = ',\n    '.join([f'[{col}]' for col in column_names])
 
-    if merge_mode and primary_keys:
-        # MERGE mode for Combi database (upsert)
-        return _generate_merge_sql(source_table, target_table, column_names,
-                                   primary_keys, schema, conversions)
-
-    elif primary_keys and apply_transformations:
-        # INSERT with deduplication for Typed database
-        pk_partition = ', '.join([f'[{pk}]' for pk in primary_keys])
-        pk_null_check = ' AND '.join([f'[{pk}] IS NOT NULL' for pk in primary_keys])
-
-        return f"""
--- Report rows with NULL in primary key columns (will be excluded)
-SELECT
-    'NULL_IN_PRIMARY_KEY' as issue_type,
-    '{target_table}' as table_name,
-{',\n'.join([f"    [{pk}]" for pk in primary_keys])},
-    CASE
-{chr(10).join([f"        WHEN [{pk}] IS NULL THEN '{pk}'" for pk in primary_keys])}
-    END as null_column
-FROM [{schema}].[{source_table}]
-WHERE NOT ({pk_null_check});
-
--- Count of excluded rows
-SELECT
-    COUNT(*) as rows_with_null_pk,
-    {chr(10).join([f"    SUM(CASE WHEN [{pk}] IS NULL THEN 1 ELSE 0 END) as [null_{pk}]," for pk in primary_keys])}
-    (SELECT COUNT(*) FROM [{schema}].[{source_table}]) as total_source_rows
-FROM [{schema}].[{source_table}];
-
--- Transform and load data (excluding NULL primary keys and handling duplicates)
-WITH source_data AS (
-    SELECT
-{',\n'.join(conversions)},
-        ROW_NUMBER() OVER (PARTITION BY {pk_partition} ORDER BY (SELECT NULL)) as rn
-    FROM [{schema}].[{source_table}]
-    WHERE {pk_null_check}  -- Exclude rows with NULL in primary key
-)
-INSERT INTO [{schema}].[{target_table}] (
-    {columns_clause}
-)
-SELECT
-    {',\n    '.join([f'[{col}]' for col in column_names])}
-FROM source_data
-WHERE rn = 1;  -- Only first occurrence of each key
-"""
-    else:
-        # Simple INSERT (for Backup or tables without primary keys)
-        return f"""
--- {'Transform and load data' if apply_transformations else 'Copy raw data'}
-INSERT INTO [{schema}].[{target_table}] (
-    {columns_clause}
-)
-SELECT
-{',\n'.join(conversions)}
-FROM [{schema}].[{source_table}];
-"""
-
-
-def _generate_merge_sql(source_table: str, target_table: str, column_names: list,
-                        primary_keys: list, schema: str, conversions: list) -> str:
-    """Generate MERGE statement for upsert operations."""
-
-    pk_join = ' AND '.join([f'target.[{pk}] = source.[{pk}]' for pk in primary_keys])
-    update_cols = ', '.join([f'target.[{col}] = source.[{col}]'
-                             for col in column_names if col not in primary_keys])
-    columns_clause = ', '.join([f'[{col}]' for col in column_names])
-    values_clause = ', '.join([f'source.[{col}]' for col in column_names])
+    # Just select columns as-is, assuming they exist in staging
+    select_clause = ',\n    '.join([f'[{col}]' for col in column_names])
 
     return f"""
--- Merge data into {target_table}
-MERGE INTO [{schema}].[{target_table}] AS target
-USING (
-    SELECT
-{',\n'.join(conversions)}
-    FROM [{schema}].[{source_table}]
-) AS source
-ON {pk_join}
-WHEN MATCHED THEN
-    UPDATE SET {update_cols}
-WHEN NOT MATCHED THEN
-    INSERT ({columns_clause})
-    VALUES ({values_clause});
-"""
-
-
-def generate_transform_script_v2(
-        base_table: str,
-        data_subset: str,  # "Delta" or "Total"
-        schema_dict: dict,
-        primary_keys: list,
-        target_db_type: str,  # "Backup", "Typed", "Combi"
-        output_dir: Path,
-        schema: str
-) -> Path:
-    """
-    Generate transformation SQL script with configurable source and target databases.
-
-    Args:
-        base_table: Base table name (e.g., "Aftaleindhold")
-        data_subset: "Delta" or "Total"
-        schema_dict: Column type definitions
-        primary_keys: List of primary key columns
-        source_db_type: Source database type
-        target_db_type: Target database type
-        output_dir: Directory to write SQL scripts
-        schema: Database schema name
-    """
-
-    # Construct table names
-    source_table = f"{base_table}_{data_subset}_Staging"
-
-    target_table = f"{base_table}_{data_subset}_{target_db_type}"
-
-    output_file = output_dir / f"transform_{source_table}_to_{target_table}.sql"
-
-    pk_info = ', '.join(primary_keys) if primary_keys else 'None'
-
-    # Determine transformation mode
-    apply_transformations = target_db_type in ["Typed", "Combi"]
-    merge_mode = target_db_type == "Combi"
-    drop_if_exists = False
-
-    # Generate verification queries
-    verification_queries = _generate_verification_sql(
-        source_table, target_table, primary_keys, schema, target_db_type
+    -- 1. BACKUP: Copy raw data from Staging to Backup
+    INSERT INTO [{schema}].[{target_table}] (
+        {columns_clause}
     )
+    SELECT
+        {select_clause}
+    FROM [{schema}].[{source_table}];
+    """
+
+
+def generate_typed_insert_sql(source_table: str, target_table: str,
+                              schema_dict: dict, primary_keys: list, schema: str) -> str:
+    """Generate INSERT for Typed (Transformations, Append-Only)."""
+    column_names = list(schema_dict.keys())
+    conversions = [generate_column_conversion(col, dtype) for col, dtype in schema_dict.items()]
+    columns_clause = ',\n    '.join([f'[{col}]' for col in column_names])
+
+    # For Typed table, we just insert everything that converts successfully.
+    # We do NOT deduplicate against existing history here, as it's a log of what was imported.
+    # However, we might want to deduplicate *within the batch* if the file has dupes?
+    # Let's assuming dedup within batch is good practice.
+
+    if primary_keys:
+        pk_partition = ', '.join([f'[{pk}]' for pk in primary_keys])
+        # We filter out rows where PK becomes NULL after conversion
+
+        return f"""
+    -- 2. TYPED: Transform and insert into Typed history
+    --    Note: Rows with invalid Primary Keys after conversion are skipped here but exist in Backup.
+    WITH transformed_data AS (
+        SELECT
+    {',\n'.join(conversions)}
+        FROM [{schema}].[{source_table}]
+    ),
+    valid_data AS (
+        SELECT *,
+            ROW_NUMBER() OVER (PARTITION BY {pk_partition} ORDER BY (SELECT NULL)) as rn
+        FROM transformed_data
+        WHERE {' AND '.join([f'[{pk}] IS NOT NULL' for pk in primary_keys])}
+    )
+    INSERT INTO [{schema}].[{target_table}] (
+        {columns_clause}
+    )
+    SELECT
+        {',\n    '.join([f'[{col}]' for col in column_names])}
+    FROM valid_data
+    WHERE rn = 1;
+    """
+    else:
+        return f"""
+    -- 2. TYPED: Transform and insert (No PK defined)
+    INSERT INTO [{schema}].[{target_table}] (
+        {columns_clause}
+    )
+    SELECT
+    {',\n'.join(conversions)}
+    FROM [{schema}].[{source_table}];
+    """
+
+
+def generate_snapshot_merge_sql(source_table: str, target_table: str,
+                                schema_dict: dict, primary_keys: list,
+                                schema: str, is_delta: bool) -> str:
+    """
+    Generate Merge/Insert for Snapshot (The active state).
+    Refreshes the 'Main' table from the current Staging batch.
+    """
+    column_names = list(schema_dict.keys())
+    conversions = [generate_column_conversion(col, dtype) for col, dtype in schema_dict.items()]
+    columns_clause = ', '.join([f'[{col}]' for col in column_names])
+
+    # Common CTE to get clean data from staging for the snapshot update
+    cte_sql = f"""
+    WITH new_data AS (
+        SELECT * FROM (
+            SELECT
+    {',\n'.join(conversions)},
+                ROW_NUMBER() OVER (PARTITION BY {', '.join([f'[{pk}]' for pk in primary_keys])} ORDER BY (SELECT NULL)) as rn
+            FROM [{schema}].[{source_table}]
+        ) t WHERE rn = 1 AND {' AND '.join([f'[{pk}] IS NOT NULL' for pk in primary_keys])}
+    )"""
+
+    if not primary_keys:
+        # Without PK, we can only append.
+        # If Total, we truncate first. If Delta, we just append.
+        op_sql = f"""
+        INSERT INTO [{schema}].[{target_table}] ({columns_clause})
+        SELECT {columns_clause} FROM new_data;
+        """
+        if not is_delta:
+             return f"""
+    -- 3. SNAPSHOT: Total Replacement (No PK)
+    TRUNCATE TABLE [{schema}].[{target_table}];
+    
+    WITH new_data AS (
+        SELECT
+    {',\n'.join(conversions)}
+        FROM [{schema}].[{source_table}]
+    )
+    INSERT INTO [{schema}].[{target_table}] ({columns_clause})
+    SELECT {columns_clause} FROM new_data;
+    """
+        else:
+            return f"""
+    -- 3. SNAPSHOT: Delta Append (No PK)
+    WITH new_data AS (
+        SELECT
+    {',\n'.join(conversions)}
+        FROM [{schema}].[{source_table}]
+    )
+    INSERT INTO [{schema}].[{target_table}] ({columns_clause})
+    SELECT {columns_clause} FROM new_data;
+    """
+
+    # Logic WITH Primary Keys
+    if not is_delta:
+        # TOTAL: Replace everything
+        return f"""
+    -- 3. SNAPSHOT: Total Replacement
+    TRUNCATE TABLE [{schema}].[{target_table}];
+
+    {cte_sql}
+    INSERT INTO [{schema}].[{target_table}] ({columns_clause})
+    SELECT {columns_clause} FROM new_data;
+    """
+    else:
+        # DELTA: Merge
+        pk_join = ' AND '.join([f'target.[{pk}] = source.[{pk}]' for pk in primary_keys])
+        update_cols = ', '.join([f'target.[{col}] = source.[{col}]'
+                                 for col in column_names if col not in primary_keys])
+        values_clause = ', '.join([f'source.[{col}]' for col in column_names])
+
+        return f"""
+    -- 3. SNAPSHOT: Delta Merge (Upsert)
+    {cte_sql}
+    MERGE INTO [{schema}].[{target_table}] AS target
+    USING new_data AS source
+    ON {pk_join}
+    WHEN MATCHED THEN
+        UPDATE SET {update_cols}
+    WHEN NOT MATCHED THEN
+        INSERT ({columns_clause})
+        VALUES ({values_clause});
+    """
+
+
+def generate_transform_script(table: str, suffix: str, schema_dict: dict,
+                              primary_keys: list, output_dir: Path,
+                              schema: str) -> Path:
+    """Generate complete transformation SQL script for one table/file-type."""
+
+    full_table_name = f"{table}_{suffix}"  # e.g., Aftale_Delta
+    staging_table = f"{full_table_name}_Staging"
+    backup_table = f"{table}_Backup"
+    typed_table = f"{table}_Typed"
+    snapshot_table = f"{table}"  # The 'Golden Record'
+
+    output_file = output_dir / f"transform_{full_table_name}.sql"
+    is_delta = (suffix == "Delta")
 
     script = f"""
--- ============================================================
--- Transformation: {source_table} → {target_table}
--- Primary key: {pk_info}
--- Mode: {'MERGE (upsert)' if merge_mode else 'INSERT'}
--- Generated automatically - review before executing
--- ============================================================
+    -- ============================================================
+    -- Pipeline Script for {table} ({suffix})
+    -- Source:  {staging_table}
+    -- Targets: {backup_table}, {typed_table}, {snapshot_table}
+    -- Generated automatically
+    -- ============================================================
 
-USE [{config.DB_NAME}];
-GO
+    USE [{config.DB_NAME}];
+    GO
 
-{generate_create_table_sql(target_table, schema_dict, primary_keys, schema, drop_if_exists)}
-GO
+    -- A. Ensure Target Tables Exist
+    ------------------------------------------------------------
+    {generate_create_table_sql(backup_table, schema_dict, primary_keys, schema, "backup")}
+    {generate_create_table_sql(typed_table, schema_dict, primary_keys, schema, "typed")}
+    {generate_create_table_sql(snapshot_table, schema_dict, primary_keys, schema, "snapshot")}
+    GO
 
-{generate_insert_sql(source_table, target_table, schema_dict, primary_keys, schema, apply_transformations, merge_mode)}
-GO
+    -- B. Execute Pipeline Steps
+    ------------------------------------------------------------
+    
+    {generate_backup_insert_sql(staging_table, backup_table, schema_dict, schema)}
+    
+    {generate_typed_insert_sql(staging_table, typed_table, schema_dict, primary_keys, schema)}
+    
+    {generate_snapshot_merge_sql(staging_table, snapshot_table, schema_dict, primary_keys, schema, is_delta)}
+    GO
 
-{verification_queries}
-GO
-"""
+    -- C. Cleanup (Optional - Staging table usually kept until file move is confirmed)
+    -- DROP TABLE [{schema}].[{staging_table}];
+    -- GO
+    """
 
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(script)
@@ -281,188 +314,58 @@ GO
     return output_file
 
 
-def _generate_verification_sql(source_table: str, target_table: str,
-                               primary_keys: list, schema: str,
-                               target_db_type: str) -> str:
-    """Generate verification queries appropriate for the target database type."""
-
-    if not primary_keys:
-        return f"""
--- ============================================================
--- VERIFICATION RESULTS
--- ============================================================
-
--- Row count verification
-SELECT
-    'ROW_COUNTS' as metric,
-    (SELECT COUNT(*) FROM [{schema}].[{source_table}]) as source_rows,
-    (SELECT COUNT(*) FROM [{schema}].[{target_table}]) as target_rows;
-"""
-
-    pk_select = ", '|', ".join([f'[{pk}]' for pk in primary_keys])
-    if len(primary_keys) > 1:
-        pk_select = f"CONCAT({pk_select})"
-
-    return f"""
--- ============================================================
--- VERIFICATION RESULTS
--- ============================================================
-
--- Final row counts
-SELECT
-    'ROW_COUNTS' as metric,
-    (SELECT COUNT(*) FROM [{schema}].[{source_table}]) as source_rows,
-    (SELECT COUNT(*) FROM [{schema}].[{target_table}]) as target_rows,
-    (SELECT COUNT(*) FROM [{schema}].[{source_table}]) -
-    (SELECT COUNT(*) FROM [{schema}].[{target_table}]) as excluded_rows;
-
--- Verify unique keys in target
-SELECT
-    'KEY_UNIQUENESS' as metric,
-    COUNT(*) as total_rows,
-    COUNT(DISTINCT {pk_select}) as unique_keys,
-    COUNT(*) - COUNT(DISTINCT {pk_select}) as should_be_zero
-FROM [{schema}].[{target_table}];
-
--- Check for any NULLs in primary keys
-SELECT
-    'NULL_CHECK_IN_TARGET' as metric,
-    {',\n    '.join([f"SUM(CASE WHEN [{pk}] IS NULL THEN 1 ELSE 0 END) as [null_{pk}]" for pk in primary_keys])},
-    COUNT(*) as total_rows
-FROM [{schema}].[{target_table}];
-
--- Sample of transformed data
-SELECT TOP 100 * FROM [{schema}].[{target_table}]
-ORDER BY {', '.join([f'[{pk}]' for pk in primary_keys])};
-"""
-
-
-def generate_pipeline_scripts(
-        tables: list[str],
-        data_types: dict,
-        table_keys: dict,
-        pipeline_steps: list[tuple[str, str]],  # [(target_db, data_subset)]
-        output_dir: Path = Path('sql_transforms')
-) -> None:
-    """
-    Generate SQL transformation scripts for a complete pipeline.
-
-    Args:
-        tables: List of table names
-        data_types: Dictionary of table schemas
-        table_keys: Dictionary of primary keys
-        pipeline_steps: List of (source_db_type, target_db_type, data_subset) tuples
-        output_dir: Output directory for scripts
-    """
+def generate_all_transform_scripts(tables: list[str], data_types: dict,
+                                   table_keys: dict,
+                                   output_dir: Path = Path('sql_transforms')) -> None:
+    """Generate SQL transformation scripts for all tables."""
 
     output_dir.mkdir(exist_ok=True)
-
     summary = []
 
     for table in tables:
-        schema = data_types.get(table)
-        keys = table_keys.get(table, None)
+        # Ensure metadata columns are in the schema
+        schema = data_types.get(table, {}).copy()
+        schema.update(table_columns.metadata_columns)
+
+        keys = table_keys.get(table)
 
         if not schema:
             print(f"  ⚠ No schema for {table}, skipping")
             continue
 
-        for target_db, data_subset in pipeline_steps:
-            print(f"Generating script: {table}_{data_subset} → {target_db}...")
+        key_info = "No PK" if not keys else f"PK: {', '.join(keys)}"
 
-            script_file = generate_transform_script_v2(
-                table, data_subset, schema, keys,
-                target_db, output_dir, config.DB_SCHEMA
+        for suffix in ["Total", "Delta"]:
+            print(f"Generating pipeline script for {table} ({suffix})...")
+            script_file = generate_transform_script(
+                table, suffix, schema, keys or [], output_dir, config.DB_SCHEMA
             )
-
             print(f"  ✓ {script_file.name}")
 
             summary.append({
                 'table': table,
-                'data_subset': data_subset,
-                'target': target_db,
-                'has_pk': bool(keys),
-                'pk_columns': keys,
-                'script': script_file.name
+                'type': suffix,
+                'script': script_file.name,
+                'pk': key_info
             })
 
     # Generate summary file
-    _write_summary_file(summary, output_dir)
+    summary_file = output_dir / "00_SUMMARY.txt"
+    with open(summary_file, 'w', encoding='utf-8') as f:
+        f.write("SQL PIPELINE SCRIPTS SUMMARY\n")
+        f.write("="*70 + "\n")
+        for item in summary:
+            f.write(f"{item['script']:<45} | {item['pk']}\n")
 
     print(f"\n✓ All scripts generated in {output_dir}")
-
-
-def _write_summary_file(summary: list[dict], output_dir: Path):
-    """Write summary of generated scripts."""
-    summary_file = output_dir / "00_SUMMARY.txt"
-
-    with open(summary_file, 'w', encoding='utf-8') as f:
-        f.write("=" * 70 + "\n")
-        f.write("SQL TRANSFORMATION SCRIPTS SUMMARY\n")
-        f.write("=" * 70 + "\n\n")
-
-        # Group by pipeline step
-        from collections import defaultdict
-        by_step = defaultdict(list)
-
-        for item in summary:
-            step_key = f"→ {item['target']} ({item['data_subset']})"
-            by_step[step_key].append(item)
-
-        for step_name, items in by_step.items():
-            f.write(f"\n{step_name}\n")
-            f.write("-" * 70 + "\n")
-            for item in items:
-                pk_info = f"PK: {', '.join(item['pk_columns'])}" if item['has_pk'] else "No PK"
-                f.write(f"{item['table']:<30} {pk_info}\n")
-
-        f.write("\n" + "=" * 70 + "\n")
-        f.write(f"Total scripts: {len(summary)}\n")
-        f.write("=" * 70 + "\n")
-
-    print(f"✓ Summary written to {summary_file}")
 
 
 if __name__ == "__main__":
     all_tables = list(table_columns.data_types.keys())
 
-    # Example: Generate scripts for Delta pipeline
-    # Staging → Backup, Staging → Typed, Typed → Combi
-    delta_pipeline_steps = [
-        ("Backup", "Delta"),
-        ("Typed", "Delta"),
-        ("Combi", "Delta"),
-    ]
-
-    # Example: Generate scripts for Total pipeline
-    # Staging → Backup, Staging → Typed
-    total_pipeline_steps = [
-        ("Backup", "Total"),
-        ("Typed", "Total"),
-        ("Combi", "Total"),
-    ]
-
-    print("Generating Delta pipeline scripts...")
-    generate_pipeline_scripts(
+    generate_all_transform_scripts(
         all_tables,
         table_columns.data_types,
         table_columns.table_keys,
-        delta_pipeline_steps,
         output_dir=Path('sql_transforms')
     )
-
-    print("\nGenerating Total pipeline scripts...")
-    generate_pipeline_scripts(
-        all_tables,
-        table_columns.data_types,
-        table_columns.table_keys,
-        total_pipeline_steps,
-        output_dir=Path('sql_transforms')
-    )
-
-    print("\n" + "=" * 70)
-    print("Next steps:")
-    print("  1. Review generated SQL scripts in sql_transforms/")
-    print("  2. Check 00_SUMMARY.txt files for overview")
-    print("  3. Execute scripts using updated run_sql_transforms.py")
-    print("=" * 70)

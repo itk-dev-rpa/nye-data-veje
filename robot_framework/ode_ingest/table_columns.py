@@ -3,6 +3,13 @@
 
 from sqlalchemy import String, Date, Numeric, Integer
 
+metadata_columns = {
+    'export_date': Date,
+    'file_origin': String(255),
+    'row_number': Integer,
+    'etl_version': String(50)
+}
+
 table_keys = {  # This table contains the keys used in the database to identify each entry.
     "Aftaleindhold":                ["Aftaleindhold"],
     "BO-aftale-haendelse":          ["Ekstern_reference_nøgle"],
