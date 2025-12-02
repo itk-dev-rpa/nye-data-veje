@@ -132,3 +132,44 @@ def get_column_list_with_types(table_name: str) -> List[Column]:
         column_type = data_types[table_name][col]
         columns_list.append(Column(col, column_type))
     return columns_list
+
+
+def get_table_row_count(table_name: str, engine: Engine) -> int:
+    """Get the number of rows in a table."""
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(f"SELECT COUNT(*) FROM [{config.DB_SCHEMA}].[{table_name}]")
+        )
+        return result.scalar()
+
+
+def drop_table_if_exists(table_name: str, engine: Engine):
+    """Drop a table if it exists."""
+    with engine.connect() as conn:
+        conn.execute(
+            text(f"IF OBJECT_ID('[{config.DB_SCHEMA}].[{table_name}]', 'U') IS NOT NULL "
+                 f"DROP TABLE [{config.DB_SCHEMA}].[{table_name}]")
+        )
+        conn.commit()
+
+
+def execute_sql(sql: str, engine: Engine):
+    """Execute a SQL statement."""
+    with engine.connect() as conn:
+        conn.execute(text(sql))
+        conn.commit()
+
+
+def get_column_list(table_name: str, engine: Engine) -> list[str]:
+    """Get list of column names from a table."""
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(f"""
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = '{config.DB_SCHEMA}' 
+                  AND TABLE_NAME = '{table_name}'
+                ORDER BY ORDINAL_POSITION
+            """)
+        )
+        return [row[0] for row in result]

@@ -69,7 +69,7 @@ def _extract_sequence_number(filename: str) -> int:
     return 0
 
 
-def get_file_sort_key(filepath: str) -> Tuple[datetime, int, str]:
+def get_file_sort_key(filepath: Path) -> Tuple[datetime, int, str]:
     """
     Create a sort-key for a filename based on:
     1. Date stamp (oldest first).
@@ -82,7 +82,7 @@ def get_file_sort_key(filepath: str) -> Tuple[datetime, int, str]:
     Returns:
         Tuple useable for sorting.
     """
-    filename = Path(filepath).name
+    filename = filepath.name
 
     file_date = _extract_date_from_filename(filename)
     seq_number = _extract_sequence_number(filename)
@@ -90,10 +90,10 @@ def get_file_sort_key(filepath: str) -> Tuple[datetime, int, str]:
     if file_date is None:
         file_date = datetime(1900, 1, 1)
 
-    return (file_date, seq_number, filename)
+    return file_date, seq_number, filename
 
 
-def sort_files(file_paths: List[str]) -> List[str]:
+def sort_files(file_paths: List[Path]) -> List[Path]:
     """
     Sort list of files based on date stamp and sequence number.
 

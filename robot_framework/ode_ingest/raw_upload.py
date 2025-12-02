@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import time
 from datetime import datetime
+import tomllib
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -45,16 +46,20 @@ def main(oc: OrchestratorConnection):
 def process_file(filepath: Path, table_name: str, include_date: bool = False) -> pd.DataFrame:
     """Process single file: load, clean, filter columns, optionally add date."""
     df = dataframe_utils.load_raw_df(filepath)
+    # Not all columns are needed and some contain sensitive information.
+    df = df[table_columns.table_used_columns[table_name]]
     # Basic cleaning is necessary, SQL column names should not contain spaces.
     df = data_cleaning.clean_basic_data(df)
     if table_name in table_columns.table_column_alias:
         # Some columns have changed names, which we fix here
         df.rename(columns=table_columns.table_column_alias[table_name], inplace=True)
-    # Not all columns are needed and some contain sensitive information.
-    df = df[table_columns.table_used_columns[table_name]]
     # Add data origin information
-    # df["file_origin"] = filepath.name
-    # df['row_number'] = range(len(df))
+    df["file_origin"] = filepath.name
+    df['row_number'] = range(len(df))
+    with open("pyproject.toml", "rb") as f:
+        toml_data = tomllib.load(f)
+        version = toml_data.get("project", {}).get("version", "N/A")
+        df['etl_version'] = version
 
     if include_date:
         date, _, _ = file_utils.get_file_sort_key(filepath)
@@ -69,6 +74,7 @@ def upload_files(directory: str, table_name: str, subset: str, connection_string
     engine = create_engine(connection_string, fast_executemany=True)
     files = file_utils.find_files(directory, f"{table_name}_{subset}")
     for filepath in files:
+        filepath = Path(filepath)
         try:
             start = time.time()
             print(f"{datetime.now().strftime("%H:%M:%S")}: Processing file {filepath}...")

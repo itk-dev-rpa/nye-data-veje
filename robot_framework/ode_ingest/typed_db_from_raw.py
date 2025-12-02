@@ -6,10 +6,10 @@ from robot_framework import config
 from robot_framework.ode_ingest.utils import dataframe_utils, db_utils
 
 tables = [  # List of tables to work on
-    # "Aftaleindhold",
-    # "BO-aftale-haendelse",
-    # "BO-aftale",
-    # "Bilag-aaben",
+    "Aftaleindhold",
+    "BO-aftale-haendelse",
+    "BO-aftale",
+    "Bilag-aaben",
     "Bilag-master",
     "FP-aftale",
     "Bilag-lukket",

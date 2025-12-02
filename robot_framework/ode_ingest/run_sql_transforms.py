@@ -156,10 +156,10 @@ if __name__ == "__main__":
     oc = OrchestratorConnection("ODE test", conn_string, crypto_key, "")
 
     sql_dir = Path('sql_transforms')
-    
+
     connection_string = oc.get_constant(config.DB_CONNECTION).value
     engine = create_engine(connection_string)
-    execute_sql_file_with_validation(Path("sql_transforms/transform_RIM-aftale_Total.sql"), engine, {})
+    execute_sql_file_with_validation(Path("sql_transforms/transform_RIM-aftale-rater_Delta.sql"), engine, {})
     # if not sql_dir.exists():
     #     print(f"Error: Directory {sql_dir} not found")
     #     print("Run generate_transform_sql.py first to generate scripts")

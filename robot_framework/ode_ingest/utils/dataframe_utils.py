@@ -46,7 +46,7 @@ def create_dataframe_from_file(
     return df
 
 
-def load_raw_df(filepath: str) -> pd.DataFrame:
+def load_raw_df(filepath: Path) -> pd.DataFrame:
     """Create a raw dataframe from CSV filepath, attempting several possible encodings.
 
     Args:

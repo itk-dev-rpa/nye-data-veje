@@ -258,7 +258,7 @@ table_used_columns = {  # This table defines all the columns we actually use fro
         "Skæringsdato",
         "Statistiknøgle",
         "Tilbageført_via",
-        "Udligngningstype",
+        "Udligningstype",
         "Udligningsårsag",
         "Udligningsbeløb",
         "Udligningsbilag",
@@ -584,7 +584,8 @@ table_used_columns = {  # This table defines all the columns we actually use fro
 
 table_column_alias = {  # This table contains aliases for column names that have changed at some point.
     'Bilag-master': {
-        'Bilagstype': 'Bilagsart'
+        'Bilagstype': 'Bilagsart',
+        'Udligngningstype': 'Udligningstype'
     },
     'Indbetalinger': {
         'Bilagstype': 'Bilagsart'
@@ -662,7 +663,7 @@ data_types = {  # This table maps columns to datatypes, as defind in the KMD API
         'Tilbageført_via': String(255),
         'Udligningsårsag': String(255),
         'Udligningsbeløb': Numeric(precision=15, scale=2),
-        'Udligngningstype': String(255),
+        'Udligningstype': String(255),
         'Udligningsbilag': String(255),
         'Udligningsdato': Date,
         'Udligningsstatus': String(255),
