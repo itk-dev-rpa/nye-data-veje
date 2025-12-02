@@ -26,19 +26,11 @@ class DataSubset(Enum):
 @dataclass
 class PipelineStep:
     """Defines a single transformation step in the pipeline."""
-    source_db: DatabaseType
     target_db: DatabaseType
     data_subset: DataSubset
     use_primary_key: bool
     add_load_date: bool = False
     add_etl_metadata: bool = True
-    
-    def get_source_table_name(self, base_table: str) -> str:
-        """Generate source table name based on configuration."""
-        parts = [base_table, self.data_subset.value]
-        if self.source_db != DatabaseType.STAGING:
-            parts.append(self.source_db.value)
-        return "_".join(parts)
     
     def get_target_table_name(self, base_table: str) -> str:
         """Generate target table name based on configuration."""
@@ -69,21 +61,18 @@ DELTA_PIPELINE = Pipeline(
     name="Delta Processing",
     steps=[
         PipelineStep(
-            source_db=DatabaseType.STAGING,
             target_db=DatabaseType.BACKUP,
             data_subset=DataSubset.DELTA,
             use_primary_key=False,  # Backup keeps all versions
             add_load_date=True,
         ),
         PipelineStep(
-            source_db=DatabaseType.STAGING,
             target_db=DatabaseType.TYPED,
             data_subset=DataSubset.DELTA,
             use_primary_key=False,  # Typed keeps all versions
             add_load_date=True,
         ),
         PipelineStep(
-            source_db=DatabaseType.TYPED,
             target_db=DatabaseType.COMBI,
             data_subset=DataSubset.DELTA,
             use_primary_key=True,  # Combi shows latest state
@@ -97,15 +86,19 @@ TOTAL_PIPELINE = Pipeline(
     name="Total Data Processing",
     steps=[
         PipelineStep(
-            source_db=DatabaseType.STAGING,
             target_db=DatabaseType.BACKUP,
             data_subset=DataSubset.TOTAL,
             use_primary_key=False,
             add_load_date=True,
         ),
         PipelineStep(
-            source_db=DatabaseType.STAGING,
             target_db=DatabaseType.TYPED,
+            data_subset=DataSubset.TOTAL,
+            use_primary_key=True,
+            add_load_date=True,
+        ),
+        PipelineStep(
+            target_db=DatabaseType.COMBI,
             data_subset=DataSubset.TOTAL,
             use_primary_key=True,
             add_load_date=True,

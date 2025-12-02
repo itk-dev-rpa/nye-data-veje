@@ -1,11 +1,14 @@
 """This module contains the main process of the robot."""
 import json
 import os
+from pathlib import Path
 
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
+from sqlalchemy import create_engine
 
-from robot_framework.ode_ingest import upload_tables
-from robot_framework.ode_ingest.utils import db_utils
+from robot_framework.ode_ingest import raw_upload
+from robot_framework.ode_ingest.utils import file_utils
+from robot_framework import config
 
 
 tables = [  # List of tables to work on
@@ -32,23 +35,19 @@ tables = [  # List of tables to work on
 def process(orchestrator_connection: OrchestratorConnection) -> None:
     """Do the primary process of the robot."""
     orchestrator_connection.log_trace("Running process.")
+    connection_string = orchestrator_connection.get_constant(config.DB_CONNECTION).value
+    engine = create_engine(connection_string, fast_executemany=True)
 
-    process_arguments = json.loads(orchestrator_connection.process_arguments)
-    create_table = process_arguments["create_table"]
-    insert_total_data = process_arguments["insert_total_data"]
-    update_total_from_delta = process_arguments["update_total_from_delta"]
-    from_to_date = process_arguments["from_to_date"]
-
-    for table in tables:
-        if create_table:
-            orchestrator_connection.log_trace(f"Create table for {table}")
-            db_utils.create_table(table, db_utils.get_column_list_with_types(table), orchestrator_connection)
-        if insert_total_data:
-            orchestrator_connection.log_trace(f"Inserting total data for {table}")
-            upload_tables.insert_total_data(table, orchestrator_connection, from_to_date=from_to_date)
-        if update_total_from_delta:
-            orchestrator_connection.log_trace(f"Inserting delta data for {table}")
-            upload_tables.update_total_from_delta(table, orchestrator_connection)
+    directory = orchestrator_connection.get_constant(config.DATA_DIRECTORY).value
+    for table_name in tables:
+        for subset in ["Total", "Delta"]:
+            files = file_utils.find_files(directory, f"{table_name}_{subset}")
+            for file in files:
+                file_path = Path(file)
+                df = raw_upload.process_file(file_path, f"{table_name}")
+                df.to_sql(f"{table_name}_{subset}_Staging", engine, schema=config.DB_SCHEMA, if_exists='append', index=False)
+                file_utils.move_processed_files(file_path)
+            # TODO: Run SQL pipeline
 
 
 if __name__ == "__main__":

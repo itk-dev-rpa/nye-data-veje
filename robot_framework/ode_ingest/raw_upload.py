@@ -43,7 +43,7 @@ def main(oc: OrchestratorConnection):
         upload_files(file_directory, table, "Delta", connection_string, oc, include_date=True)
 
 
-def process_file(filepath: Path, table_name: str, include_date: bool = False) -> pd.DataFrame:
+def process_file(filepath: Path, table_name: str) -> pd.DataFrame:
     """Process single file: load, clean, filter columns, optionally add date."""
     df = dataframe_utils.load_raw_df(filepath)
     # Not all columns are needed and some contain sensitive information.
@@ -54,16 +54,14 @@ def process_file(filepath: Path, table_name: str, include_date: bool = False) ->
         # Some columns have changed names, which we fix here
         df.rename(columns=table_columns.table_column_alias[table_name], inplace=True)
     # Add data origin information
+    date, _, _ = file_utils.get_file_sort_key(filepath)
+    df["export_date"] = date
     df["file_origin"] = filepath.name
     df['row_number'] = range(len(df))
     with open("pyproject.toml", "rb") as f:
         toml_data = tomllib.load(f)
         version = toml_data.get("project", {}).get("version", "N/A")
         df['etl_version'] = version
-
-    if include_date:
-        date, _, _ = file_utils.get_file_sort_key(filepath)
-        df["export_date"] = date
 
     return df
 

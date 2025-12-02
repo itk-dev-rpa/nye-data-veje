@@ -8,8 +8,8 @@ from sqlalchemy import create_engine
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 
 from robot_framework import config
-from robot_framework.ode_ingest.pipeline_config import DELTA_PIPELINE, TOTAL_PIPELINE
-from robot_framework.ode_ingest.pipeline_executor import PipelineExecutor
+from robot_framework.ode_ingest.pipeline.pipeline_config import DELTA_PIPELINE, TOTAL_PIPELINE
+from robot_framework.ode_ingest.pipeline.pipeline_executor import PipelineExecutor
 from robot_framework.ode_ingest import table_columns
 
 

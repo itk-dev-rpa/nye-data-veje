@@ -217,7 +217,6 @@ def generate_transform_script_v2(
         data_subset: str,  # "Delta" or "Total"
         schema_dict: dict,
         primary_keys: list,
-        source_db_type: str,  # "Staging", "Backup", "Typed"
         target_db_type: str,  # "Backup", "Typed", "Combi"
         output_dir: Path,
         schema: str
@@ -237,9 +236,7 @@ def generate_transform_script_v2(
     """
 
     # Construct table names
-    source_table = f"{base_table}_{data_subset}"
-    if source_db_type != "Staging":
-        source_table += f"_{source_db_type}"
+    source_table = f"{base_table}_{data_subset}_Staging"
 
     target_table = f"{base_table}_{data_subset}_{target_db_type}"
 
@@ -250,7 +247,7 @@ def generate_transform_script_v2(
     # Determine transformation mode
     apply_transformations = target_db_type in ["Typed", "Combi"]
     merge_mode = target_db_type == "Combi"
-    drop_if_exists = target_db_type != "Combi"  # Don't drop Combi, we merge into it
+    drop_if_exists = False
 
     # Generate verification queries
     verification_queries = _generate_verification_sql(
@@ -260,7 +257,6 @@ def generate_transform_script_v2(
     script = f"""
 -- ============================================================
 -- Transformation: {source_table} → {target_table}
--- Type: {source_db_type} to {target_db_type}
 -- Primary key: {pk_info}
 -- Mode: {'MERGE (upsert)' if merge_mode else 'INSERT'}
 -- Generated automatically - review before executing
@@ -345,7 +341,7 @@ def generate_pipeline_scripts(
         tables: list[str],
         data_types: dict,
         table_keys: dict,
-        pipeline_steps: list[tuple[str, str, str]],  # [(source_db, target_db, data_subset)]
+        pipeline_steps: list[tuple[str, str]],  # [(target_db, data_subset)]
         output_dir: Path = Path('sql_transforms')
 ) -> None:
     """
@@ -365,18 +361,18 @@ def generate_pipeline_scripts(
 
     for table in tables:
         schema = data_types.get(table)
-        keys = table_keys.get(table, [])
+        keys = table_keys.get(table, None)
 
         if not schema:
             print(f"  ⚠ No schema for {table}, skipping")
             continue
 
-        for source_db, target_db, data_subset in pipeline_steps:
-            print(f"Generating script: {table}_{data_subset} ({source_db} → {target_db})...")
+        for target_db, data_subset in pipeline_steps:
+            print(f"Generating script: {table}_{data_subset} → {target_db}...")
 
             script_file = generate_transform_script_v2(
                 table, data_subset, schema, keys,
-                source_db, target_db, output_dir, config.DB_SCHEMA
+                target_db, output_dir, config.DB_SCHEMA
             )
 
             print(f"  ✓ {script_file.name}")
@@ -384,7 +380,6 @@ def generate_pipeline_scripts(
             summary.append({
                 'table': table,
                 'data_subset': data_subset,
-                'source': source_db,
                 'target': target_db,
                 'has_pk': bool(keys),
                 'pk_columns': keys,
@@ -411,7 +406,7 @@ def _write_summary_file(summary: list[dict], output_dir: Path):
         by_step = defaultdict(list)
 
         for item in summary:
-            step_key = f"{item['source']} → {item['target']} ({item['data_subset']})"
+            step_key = f"→ {item['target']} ({item['data_subset']})"
             by_step[step_key].append(item)
 
         for step_name, items in by_step.items():
@@ -434,17 +429,17 @@ if __name__ == "__main__":
     # Example: Generate scripts for Delta pipeline
     # Staging → Backup, Staging → Typed, Typed → Combi
     delta_pipeline_steps = [
-        ("Staging", "Backup", "Delta"),
-        ("Staging", "Typed", "Delta"),
-        ("Staging", "Combi", "Delta"),
+        ("Backup", "Delta"),
+        ("Typed", "Delta"),
+        ("Combi", "Delta"),
     ]
 
     # Example: Generate scripts for Total pipeline
     # Staging → Backup, Staging → Typed
     total_pipeline_steps = [
-        ("Staging", "Backup", "Total"),
-        ("Staging", "Typed", "Total"),
-        ("Staging", "Combi", "Total"),
+        ("Backup", "Total"),
+        ("Typed", "Total"),
+        ("Combi", "Total"),
     ]
 
     print("Generating Delta pipeline scripts...")
@@ -453,7 +448,7 @@ if __name__ == "__main__":
         table_columns.data_types,
         table_columns.table_keys,
         delta_pipeline_steps,
-        output_dir=Path('sql_transforms/delta')
+        output_dir=Path('sql_transforms')
     )
 
     print("\nGenerating Total pipeline scripts...")
@@ -462,7 +457,7 @@ if __name__ == "__main__":
         table_columns.data_types,
         table_columns.table_keys,
         total_pipeline_steps,
-        output_dir=Path('sql_transforms/total')
+        output_dir=Path('sql_transforms')
     )
 
     print("\n" + "=" * 70)
