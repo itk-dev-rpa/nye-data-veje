@@ -1,0 +1,36 @@
+SQL PIPELINE SCRIPTS SUMMARY
+======================================================================
+transform_Bilag-master_Total.sql              | PK: Bilagsnummer, Gentagelsesposition, Position, Delposition
+transform_Bilag-master_Delta.sql              | PK: Bilagsnummer, Gentagelsesposition, Position, Delposition
+transform_Bilag-aaben_Total.sql               | No PK
+transform_Bilag-aaben_Delta.sql               | No PK
+transform_Bilag-lukket_Total.sql              | PK: Dato-ID, Identifikation, Intervalnummer, Recordnummer
+transform_Bilag-lukket_Delta.sql              | PK: Dato-ID, Identifikation, Intervalnummer, Recordnummer
+transform_Aftaleindhold_Total.sql             | PK: Aftaleindhold
+transform_Aftaleindhold_Delta.sql             | PK: Aftaleindhold
+transform_BO-aftale_Total.sql                 | PK: Aftalenummer, Bilagsnummer, Position
+transform_BO-aftale_Delta.sql                 | PK: Aftalenummer, Bilagsnummer, Position
+transform_BO-aftale-haendelse_Total.sql       | PK: Ekstern_reference_nøgle
+transform_BO-aftale-haendelse_Delta.sql       | PK: Ekstern_reference_nøgle
+transform_FP-aftale_Total.sql                 | No PK
+transform_FP-aftale_Delta.sql                 | No PK
+transform_UU-aftale_Total.sql                 | No PK
+transform_UU-aftale_Delta.sql                 | No PK
+transform_UU-aftale-haefter_Total.sql         | PK: Klient, Aftalenummer, Forretningspartner
+transform_UU-aftale-haefter_Delta.sql         | PK: Klient, Aftalenummer, Forretningspartner
+transform_RIM-aftale_Total.sql                | No PK
+transform_RIM-aftale_Delta.sql                | No PK
+transform_RIM-aftale-rater_Total.sql          | No PK
+transform_RIM-aftale-rater_Delta.sql          | No PK
+transform_RIM-aftale-renter_Total.sql         | PK: Aftalenummer, Intr-posnr
+transform_RIM-aftale-renter_Delta.sql         | PK: Aftalenummer, Intr-posnr
+transform_Indbetalinger_Total.sql             | PK: Art_kilde, Betalingsidentifikator, Løbenummer
+transform_Indbetalinger_Delta.sql             | PK: Art_kilde, Betalingsidentifikator, Løbenummer
+transform_Rykker_Total.sql                    | PK: Dato-ID, Identifikation, Forretningspartner, Aftalekonto, Rykkertæller, Bilagsnummer, Gentagelsesposition, Position, Delposition
+transform_Rykker_Delta.sql                    | PK: Dato-ID, Identifikation, Forretningspartner, Aftalekonto, Rykkertæller, Bilagsnummer, Gentagelsesposition, Position, Delposition
+transform_Forretningspartner_Total.sql        | PK: Klient, Forretningspartner, Identifikationsart, Forretningspartner-GUID
+transform_Forretningspartner_Delta.sql        | PK: Klient, Forretningspartner, Identifikationsart, Forretningspartner-GUID
+transform_Opsaetning-Aftalekontotype_Total.sql | PK: Klient, Sprognøgle, Aftalekontotype
+transform_Opsaetning-Aftalekontotype_Delta.sql | PK: Klient, Sprognøgle, Aftalekontotype
+transform_Opsaetning-Rykkerniveau_Total.sql   | PK: Sprognøgle, Rykkeprocedure, Rykkeniveau
+transform_Opsaetning-Rykkerniveau_Delta.sql   | PK: Sprognøgle, Rykkeprocedure, Rykkeniveau
