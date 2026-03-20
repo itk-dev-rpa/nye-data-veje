@@ -1,7 +1,11 @@
-"""
-file_utils.py
+"""File system utilities for ODE data ingestion.
 
-File system utility functions for finding and handling files.
+Provides functions for:
+- Finding files matching partial names
+- Extracting date stamps and sequence numbers from filenames
+- Sorting files chronologically
+- Moving processed files to archive
+- Reading project version from pyproject.toml
 """
 import re
 import tomllib
@@ -112,12 +116,28 @@ def sort_files(file_paths: List[Path]) -> List[Path]:
 
 
 def move_processed_files(filepath: Path, processed_path: str = "processed_files"):
+    """Move processed file to archive subdirectory.
+
+    Args:
+        filepath: Path to the file to move
+        processed_path: Subdirectory name for processed files (default: "processed_files")
+    """
     directory, filename = path.split(filepath)
     shutil.move(filepath, path.join(directory, processed_path, filename))
 
 
 def get_project_version() -> str:
-    """Finder projektets rod ved at lede efter pyproject.toml opad i stien."""
+    """Extract project version from pyproject.toml.
+
+    Searches upward from current file location to find pyproject.toml
+    and extracts the version number.
+
+    Returns:
+        Version string from pyproject.toml
+
+    Raises:
+        FileNotFoundError: If pyproject.toml cannot be found in parent directories
+    """
     current_path = Path(__file__).resolve()
 
     # Tjek nuværende mappe og alle forældremapper

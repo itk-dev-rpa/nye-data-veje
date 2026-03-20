@@ -1,4 +1,11 @@
-"""This module contains the main process of the robot."""
+"""Main ETL process for ODE Debitor data ingestion.
+
+This module orchestrates the complete data pipeline:
+1. Finds and loads raw CSV files from the data directory
+2. Processes and stages data in SQL Server staging tables
+3. Executes SQL transformations (Backup -> Typed -> Snapshot)
+4. Logs validation results and ingestion statistics
+"""
 import json
 import os
 from pathlib import Path
@@ -33,7 +40,22 @@ tables = [  # List of tables to work on
 
 
 def process(orchestrator_connection: OrchestratorConnection) -> None:
-    """Do the primary process of the robot."""
+    """Execute the complete ETL pipeline for all configured tables.
+
+    This function processes each table by:
+    1. Finding all Total and Delta files for the table
+    2. Loading and staging each file to SQL Server
+    3. Running SQL transformations through the pipeline
+    4. Logging statistics and validation results
+    5. Moving processed files to archive
+
+    Args:
+        orchestrator_connection: OpenOrchestrator connection for logging and config access
+
+    Raises:
+        FileNotFoundError: If SQL transform directory doesn't exist
+        Exception: Any errors during file processing are caught, logged, and stop processing for that table
+    """
     orchestrator_connection.log_trace("Running process.")
     connection_string = orchestrator_connection.get_constant(config.DB_CONNECTION).value
     engine = create_engine(connection_string, fast_executemany=True)

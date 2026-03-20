@@ -1,7 +1,11 @@
-"""
-dataframe_utils.py
+"""Pandas DataFrame utilities for data loading and validation.
 
-Functions for creating and cleaning pandas DataFrames from files.
+Provides functions for:
+- Loading CSV files with multiple encoding fallback
+- Type conversion (dates, numbers)
+- Primary key validation
+- NULL handling
+- SQL table loading
 """
 from pathlib import Path
 from typing import List, Optional
@@ -71,6 +75,15 @@ def load_raw_df(filepath: Path) -> pd.DataFrame:
 
 
 def load_df_from_sql(table_name: str, engine: Engine) -> pd.DataFrame:
+    """Load DataFrame from SQL Server table.
+
+    Args:
+        table_name: Name of the table to load
+        engine: SQLAlchemy engine for database connection
+
+    Returns:
+        DataFrame containing all rows from the specified table
+    """
     return pd.read_sql(f'SELECT * FROM [{config.DB_NAME}].[{config.DB_SCHEMA}].[{table_name}]', engine)
 
 
@@ -149,6 +162,21 @@ def convert_null(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def set_types_and_keys(df: pd.DataFrame, table_name: str, identifier: str, oc: OrchestratorConnection, date_filter: Optional[dict] = None) -> pd.DataFrame:
+    """Apply type conversions, validations, and filters to DataFrame.
+
+    Args:
+        df: DataFrame to process
+        table_name: Name of table (for schema lookup)
+        identifier: Identifier for logging (filename or table name)
+        oc: OrchestratorConnection for error logging
+        date_filter: Optional date range filter
+
+    Returns:
+        Processed DataFrame with types converted and invalid rows removed
+
+    Raises:
+        BrokenPipeError: If all rows are removed during validation
+    """
     date_columns = [col for col, type_ in data_types[table_name].items() if type_ == Date]
     number_columns = [col for col, type_ in data_types[table_name].items() if type_ in [Numeric, Integer]]
     keys = table_keys[table_name]

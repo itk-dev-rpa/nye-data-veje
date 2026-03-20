@@ -1,7 +1,8 @@
-"""
-run_sql_transforms.py
+"""SQL transformation script executor with validation and logging.
 
-Execute SQL transformation scripts with validation reporting.
+This module executes the generated SQL transformation scripts and captures
+validation metrics including row counts, data quality issues, and execution status.
+Results are logged to a JSON file for auditing and troubleshooting.
 """
 from pathlib import Path
 from sqlalchemy import create_engine, text
@@ -15,7 +16,20 @@ from robot_framework import config
 
 def execute_sql_file_with_validation(filepath: Path, engine,
                                      validation_log: dict, log_key: str = None) -> None:
-    """Execute SQL script and capture validation results."""
+    """Execute SQL transformation script and capture validation metrics.
+
+    Splits SQL file by GO statements and executes each batch separately.
+    Captures row counts and data quality issues from validation queries.
+
+    Args:
+        filepath: Path to the SQL transformation script
+        engine: SQLAlchemy engine for database connection
+        validation_log: Dictionary to store validation results (modified in-place)
+        log_key: Optional custom key for the validation log entry (defaults to filename)
+
+    Raises:
+        Exception: Re-raises any SQL execution errors after logging them
+    """
 
     print(f"\nExecuting {filepath.name}...")
 
@@ -93,7 +107,16 @@ def execute_sql_file_with_validation(filepath: Path, engine,
 
 def run_all_transforms(sql_dir: Path, oc,
                        validation_log_file: Path = Path('transform_validation.json')) -> None:
-    """Execute all transformation scripts with validation tracking."""
+    """Execute all SQL transformation scripts in a directory with validation tracking.
+
+    Processes all transform_*.sql files in the specified directory, logs results,
+    and generates a summary report.
+
+    Args:
+        sql_dir: Directory containing SQL transformation scripts
+        oc: OpenOrchestrator connection for config access
+        validation_log_file: Path to JSON file for storing validation results
+    """
 
     connection_string = oc.get_constant(config.DB_CONNECTION).value
     engine = create_engine(connection_string)

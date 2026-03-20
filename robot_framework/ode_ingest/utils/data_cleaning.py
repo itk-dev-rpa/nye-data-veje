@@ -1,8 +1,12 @@
-"""
-data_cleaning.py
+"""Basic DataFrame cleaning utilities.
 
-Provides basic utilities for cleaning DataFrames, such as removing unnecessary columns,
-trimming whitespace, and standardizing column names. Should be used as the first step in data processing.
+Provides basic utilities for cleaning DataFrames:
+- Removing unnecessary columns (unnamed Excel export columns)
+- Trimming whitespace from column names
+- Standardizing column names (spaces to underscores)
+- Ensuring unique column names
+
+Should be used as the first step in data processing before type conversion.
 """
 
 import pandas as pd

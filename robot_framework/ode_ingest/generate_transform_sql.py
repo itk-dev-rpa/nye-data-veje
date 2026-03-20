@@ -1,8 +1,16 @@
-"""
-generate_transform_sql.py
+"""SQL transformation script generator for ODE data pipeline.
 
-Generate SQL scripts for transforming raw tables through the pipeline:
-Staging -> Backup (Raw) -> Typed (History) -> Snapshot (Current State)
+This module generates SQL scripts that transform data through a multi-stage pipeline:
+    Staging (Raw CSV data)
+    -> Backup (Raw archive, NVARCHAR types)
+    -> Typed (Type-converted history, append-only)
+    -> Snapshot (Current state with primary keys)
+
+The generated SQL scripts handle:
+- Table creation with appropriate data types
+- Type conversion and data cleaning
+- Deduplication based on primary keys
+- Total (full replace) vs Delta (merge/upsert) logic
 """
 from pathlib import Path
 from sqlalchemy import Integer, Date, DateTime, Numeric, String
@@ -11,7 +19,14 @@ from robot_framework import config
 
 
 def get_sql_type_string(sa_type) -> str:
-    """Convert SQLAlchemy type to SQL Server type string."""
+    """Convert SQLAlchemy type to SQL Server type string.
+
+    Args:
+        sa_type: SQLAlchemy type (class or instance) to convert
+
+    Returns:
+        SQL Server type string (e.g., "INT", "DATE", "NVARCHAR(MAX)")
+    """
     # Handle both class and instance
     if sa_type is Integer or (hasattr(sa_type, '__class__') and type(sa_type).__name__ == 'Integer'):
         return "INT"
@@ -33,7 +48,22 @@ def get_sql_type_string(sa_type) -> str:
 
 
 def generate_column_conversion(col_name: str, sa_type, source_col: str = None) -> str:
-    """Generate SQL conversion expression for a column - inline for performance."""
+    """Generate SQL conversion expression for a column with inline data cleaning.
+
+    Handles various data formats from KMD Opus ODE:
+    - Integer: Removes dots (thousand separators)
+    - Date: Handles YYYYMMDD, DD.MM.YYYY, and ISO formats, filters invalid dates
+    - Numeric: Handles comma decimals, trailing minus signs for negatives
+    - String: Trims whitespace
+
+    Args:
+        col_name: Target column name in the SQL output
+        sa_type: SQLAlchemy type defining the expected data type
+        source_col: Source column name (defaults to col_name if not provided)
+
+    Returns:
+        SQL SELECT expression with type conversion and cleaning logic
+    """
     if source_col is None:
         source_col = col_name
 
@@ -69,9 +99,20 @@ def generate_column_conversion(col_name: str, sa_type, source_col: str = None) -
 def generate_create_table_sql(table_name: str, schema_dict: dict,
                               primary_keys: list, schema: str,
                               table_type: str = "typed") -> str:
-    """
-    Generate CREATE TABLE statement.
-    table_type: 'backup' (all NVARCHAR), 'typed' (Correct types), 'snapshot' (Correct types + PK)
+    """Generate CREATE TABLE SQL statement with appropriate constraints.
+
+    Args:
+        table_name: Name of the table to create
+        schema_dict: Dictionary mapping column names to SQLAlchemy types
+        primary_keys: List of column names forming the primary key
+        schema: SQL Server schema name (e.g., 'ode')
+        table_type: Type of table to create:
+            - 'backup': All columns as NVARCHAR(MAX), no constraints
+            - 'typed': Proper data types, nullable columns
+            - 'snapshot': Proper data types with PRIMARY KEY constraint
+
+    Returns:
+        SQL CREATE TABLE statement wrapped in IF NOT EXISTS check
     """
     columns = []
     for col_name, col_type in schema_dict.items():
@@ -107,7 +148,17 @@ def generate_create_table_sql(table_name: str, schema_dict: dict,
 
 def generate_backup_insert_sql(source_table: str, target_table: str,
                                schema_dict: dict, schema: str) -> str:
-    """Generate INSERT for Backup (Raw Copy)."""
+    """Generate INSERT statement for Backup table (raw data archive).
+
+    Args:
+        source_table: Source staging table name
+        target_table: Target backup table name
+        schema_dict: Dictionary of column definitions
+        schema: SQL Server schema name
+
+    Returns:
+        SQL INSERT statement copying raw data as-is from staging to backup
+    """
     column_names = list(schema_dict.keys())
     columns_clause = ',\n    '.join([f'[{col}]' for col in column_names])
 
@@ -127,7 +178,21 @@ def generate_backup_insert_sql(source_table: str, target_table: str,
 
 def generate_typed_insert_sql(source_table: str, target_table: str,
                               schema_dict: dict, primary_keys: list, schema: str) -> str:
-    """Generate INSERT for Typed (Transformations, Append-Only)."""
+    """Generate INSERT statement for Typed table (type-converted history).
+
+    Deduplicates within batch based on primary keys and filters out rows
+    where primary key values become NULL after conversion.
+
+    Args:
+        source_table: Source staging table name
+        target_table: Target typed table name
+        schema_dict: Dictionary mapping column names to SQLAlchemy types
+        primary_keys: List of primary key column names
+        schema: SQL Server schema name
+
+    Returns:
+        SQL INSERT statement with type conversion and deduplication logic
+    """
     column_names = list(schema_dict.keys())
     conversions = [generate_column_conversion(col, dtype) for col, dtype in schema_dict.items()]
     columns_clause = ',\n    '.join([f'[{col}]' for col in column_names])
@@ -178,9 +243,22 @@ def generate_typed_insert_sql(source_table: str, target_table: str,
 def generate_snapshot_merge_sql(source_table: str, target_table: str,
                                 schema_dict: dict, primary_keys: list,
                                 schema: str, is_delta: bool) -> str:
-    """
-    Generate Merge/Insert for Snapshot (The active state).
-    Refreshes the 'Main' table from the current Staging batch.
+    """Generate MERGE/INSERT statement for Snapshot table (current state).
+
+    Behavior differs based on file type:
+    - Total files: INSERT all data (table expected to be truncated beforehand)
+    - Delta files: MERGE (UPSERT) new data with existing records
+
+    Args:
+        source_table: Source staging table name
+        target_table: Target snapshot table name
+        schema_dict: Dictionary mapping column names to SQLAlchemy types
+        primary_keys: List of primary key column names
+        schema: SQL Server schema name
+        is_delta: True if processing Delta file, False for Total file
+
+    Returns:
+        SQL MERGE or INSERT statement maintaining current state
     """
     column_names = list(schema_dict.keys())
     conversions = [generate_column_conversion(col, dtype) for col, dtype in schema_dict.items()]
@@ -259,9 +337,15 @@ def generate_snapshot_merge_sql(source_table: str, target_table: str,
 
 
 def generate_validation_sql(staging_table: str, snapshot_table: str, schema: str) -> str:
-    """
-    Generate validation query to output metrics for run_sql_transforms.py.
-    Matches expectation of 'ROW_COUNTS' in the first column.
+    """Generate validation query to output row count metrics.
+
+    Args:
+        staging_table: Source staging table name
+        snapshot_table: Target snapshot table name
+        schema: SQL Server schema name
+
+    Returns:
+        SQL SELECT statement returning row counts for validation logging
     """
     return f"""
     -- D. Validation Metrics
@@ -276,7 +360,19 @@ def generate_validation_sql(staging_table: str, snapshot_table: str, schema: str
 def generate_transform_script(table: str, suffix: str, schema_dict: dict,
                               primary_keys: list, output_dir: Path,
                               schema: str) -> Path:
-    """Generate complete transformation SQL script for one table/file-type."""
+    """Generate complete transformation SQL script for one table/file-type.
+
+    Args:
+        table: Base table name (e.g., 'Aftaleindhold')
+        suffix: File type suffix ('Total' or 'Delta')
+        schema_dict: Dictionary mapping column names to SQLAlchemy types
+        primary_keys: List of primary key column names
+        output_dir: Directory to write the generated SQL script
+        schema: SQL Server schema name
+
+    Returns:
+        Path to the generated SQL script file
+    """
 
     full_table_name = f"{table}_{suffix}"  # e.g., Aftale_Delta
     staging_table = f"{full_table_name}_Staging"
@@ -334,7 +430,17 @@ def generate_transform_script(table: str, suffix: str, schema_dict: dict,
 def generate_all_transform_scripts(tables: list[str], data_types: dict,
                                    table_keys: dict,
                                    output_dir: Path = Path('sql_transforms')) -> None:
-    """Generate SQL transformation scripts for all tables."""
+    """Generate SQL transformation scripts for all configured tables.
+
+    Creates transformation scripts for both Total and Delta variants of each table,
+    plus a summary file listing all generated scripts.
+
+    Args:
+        tables: List of base table names to generate scripts for
+        data_types: Dictionary mapping table names to their column type definitions
+        table_keys: Dictionary mapping table names to their primary key columns
+        output_dir: Directory to write generated SQL scripts (default: 'sql_transforms')
+    """
 
     output_dir.mkdir(exist_ok=True)
     summary = []
