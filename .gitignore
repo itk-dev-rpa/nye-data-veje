@@ -164,5 +164,7 @@ dmypy.json
 NOTES.md
 docs/
 data_profiles
+sql_transforms/
+transform_validation.json
 
 .vscode/

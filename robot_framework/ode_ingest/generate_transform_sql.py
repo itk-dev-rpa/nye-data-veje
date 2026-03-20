@@ -357,30 +357,26 @@ def generate_validation_sql(staging_table: str, snapshot_table: str, schema: str
     """
 
 
-def generate_transform_script(table: str, suffix: str, schema_dict: dict,
-                              primary_keys: list, output_dir: Path,
-                              schema: str) -> Path:
-    """Generate complete transformation SQL script for one table/file-type.
+def generate_transform_script_string(table: str, suffix: str, schema_dict: dict,
+                                     primary_keys: list, schema: str) -> str:
+    """Generate complete transformation SQL script as string.
 
     Args:
         table: Base table name (e.g., 'Aftaleindhold')
         suffix: File type suffix ('Total' or 'Delta')
         schema_dict: Dictionary mapping column names to SQLAlchemy types
         primary_keys: List of primary key column names
-        output_dir: Directory to write the generated SQL script
         schema: SQL Server schema name
 
     Returns:
-        Path to the generated SQL script file
+        Complete SQL transformation script as string
     """
-
     full_table_name = f"{table}_{suffix}"  # e.g., Aftale_Delta
     staging_table = f"{full_table_name}_Staging"
     backup_table = f"{full_table_name}_Backup"
     typed_table = f"{full_table_name}_Typed"
     snapshot_table = f"{table}"  # The 'Golden Record'
 
-    output_file = output_dir / f"transform_{full_table_name}.sql"
     is_delta = (suffix == "Delta")
 
     script = f"""
@@ -403,13 +399,13 @@ def generate_transform_script(table: str, suffix: str, schema_dict: dict,
 
     -- B. Execute Pipeline Steps
     ------------------------------------------------------------
-    
+
     {generate_backup_insert_sql(staging_table, backup_table, schema_dict, schema)}
     GO
-    
+
     {generate_typed_insert_sql(staging_table, typed_table, schema_dict, primary_keys, schema)}
     GO
-    
+
     {generate_snapshot_merge_sql(staging_table, snapshot_table, schema_dict, primary_keys, schema, is_delta)}
     GO
 
@@ -420,6 +416,30 @@ def generate_transform_script(table: str, suffix: str, schema_dict: dict,
     DROP TABLE [{schema}].[{staging_table}];
     GO
     """
+
+    return script
+
+
+def generate_transform_script(table: str, suffix: str, schema_dict: dict,
+                              primary_keys: list, output_dir: Path,
+                              schema: str) -> Path:
+    """Generate complete transformation SQL script and write to file.
+
+    Args:
+        table: Base table name (e.g., 'Aftaleindhold')
+        suffix: File type suffix ('Total' or 'Delta')
+        schema_dict: Dictionary mapping column names to SQLAlchemy types
+        primary_keys: List of primary key column names
+        output_dir: Directory to write the generated SQL script
+        schema: SQL Server schema name
+
+    Returns:
+        Path to the generated SQL script file
+    """
+    full_table_name = f"{table}_{suffix}"
+    output_file = output_dir / f"transform_{full_table_name}.sql"
+
+    script = generate_transform_script_string(table, suffix, schema_dict, primary_keys, schema)
 
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(script)

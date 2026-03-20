@@ -14,37 +14,30 @@ from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConn
 from robot_framework import config
 
 
-def execute_sql_file_with_validation(filepath: Path, engine,
-                                     validation_log: dict, log_key: str = None) -> None:
-    """Execute SQL transformation script and capture validation metrics.
+def execute_sql_string_with_validation(sql_content: str, engine,
+                                       validation_log: dict, log_key: str) -> None:
+    """Execute SQL transformation script string and capture validation metrics.
 
-    Splits SQL file by GO statements and executes each batch separately.
+    Splits SQL content by GO statements and executes each batch separately.
     Captures row counts and data quality issues from validation queries.
 
     Args:
-        filepath: Path to the SQL transformation script
+        sql_content: SQL script content as string
         engine: SQLAlchemy engine for database connection
         validation_log: Dictionary to store validation results (modified in-place)
-        log_key: Optional custom key for the validation log entry (defaults to filename)
+        log_key: Key for the validation log entry
 
     Raises:
         Exception: Re-raises any SQL execution errors after logging them
     """
-
-    print(f"\nExecuting {filepath.name}...")
-
-    with open(filepath, 'r', encoding='utf-8') as f:
-        sql_content = f.read()
+    print(f"\nExecuting transformation for {log_key}...")
 
     # Split by GO statements
     batches = [batch.strip() for batch in sql_content.split('GO\n') if batch.strip()]
-    if log_key:
-        entry_name = log_key
-    else:
-        entry_name = filepath.stem.replace('transform_', '')
-    validation_log[entry_name] = {
+
+    validation_log[log_key] = {
         'executed_at': datetime.now().isoformat(),
-        'script': filepath.name,
+        'script': 'in-memory',
         'status': 'in_progress',
         'issues': []
     }
@@ -72,7 +65,7 @@ def execute_sql_file_with_validation(filepath: Path, engine,
                             # NULL in primary key report
                             if len(rows) > 0 and 'NULL_IN_PRIMARY_KEY' in str(first_row):
                                 print(f"  ⚠ Found {len(rows)} rows with NULL in primary key")
-                                validation_log[entry_name]['issues'].append({
+                                validation_log[log_key]['issues'].append({
                                     'type': 'null_in_primary_key',
                                     'count': len(rows),
                                     'sample': [dict(row._mapping) for row in rows[:5]]
@@ -88,7 +81,7 @@ def execute_sql_file_with_validation(filepath: Path, engine,
                                     if excluded > 0:
                                         print(f"  ⚠ Excluded rows: {excluded}")
 
-                                validation_log[entry_name]['row_counts'] = row_dict
+                                validation_log[log_key]['row_counts'] = row_dict
 
                     connection.commit()
                 except Exception:
@@ -97,11 +90,41 @@ def execute_sql_file_with_validation(filepath: Path, engine,
 
             except Exception as exc:
                 print(f"  ✗ Error in batch {i}: {exc}")
-                validation_log[entry_name]['status'] = 'failed'
-                validation_log[entry_name]['error'] = str(exc)
+                validation_log[log_key]['status'] = 'failed'
+                validation_log[log_key]['error'] = str(exc)
                 raise
 
-    validation_log[entry_name]['status'] = 'completed'
+    validation_log[log_key]['status'] = 'completed'
+    print(f"  ✓ Transformation completed")
+
+
+def execute_sql_file_with_validation(filepath: Path, engine,
+                                     validation_log: dict, log_key: str = None) -> None:
+    """Execute SQL transformation script from file and capture validation metrics.
+
+    Wrapper around execute_sql_string_with_validation that reads from a file.
+
+    Args:
+        filepath: Path to the SQL transformation script
+        engine: SQLAlchemy engine for database connection
+        validation_log: Dictionary to store validation results (modified in-place)
+        log_key: Optional custom key for the validation log entry (defaults to filename)
+
+    Raises:
+        Exception: Re-raises any SQL execution errors after logging them
+    """
+    print(f"\nExecuting {filepath.name}...")
+
+    with open(filepath, 'r', encoding='utf-8') as f:
+        sql_content = f.read()
+
+    if log_key is None:
+        log_key = filepath.stem.replace('transform_', '')
+
+    # Update to use file name in log
+    execute_sql_string_with_validation(sql_content, engine, validation_log, log_key)
+    # Override the script name to show actual file
+    validation_log[log_key]['script'] = filepath.name
     print(f"  ✓ {filepath.name} completed")
 
 
