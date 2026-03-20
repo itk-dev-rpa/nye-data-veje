@@ -127,7 +127,7 @@ def move_processed_files(filepath: Path, processed_path: str = "processed_files"
 
 
 def get_project_version() -> str:
-    """Extract project version from pyproject.toml.
+    """Extract project version from pyproject.toml, used for logging.
 
     Searches upward from current file location to find pyproject.toml
     and extracts the version number.
@@ -141,9 +141,9 @@ def get_project_version() -> str:
     current_path = Path(__file__).resolve()
 
     # Tjek nuværende mappe og alle forældremapper
-    for path in [current_path] + list(current_path.parents):
-        if (path / "pyproject.toml").exists():
-            with open(path / "pyproject.toml", "rb") as f:
+    for p in [current_path] + list(current_path.parents):
+        if (p / "pyproject.toml").exists():
+            with open(p / "pyproject.toml", "rb") as f:
                 toml_data = tomllib.load(f)
                 return toml_data.get("project", {}).get("version", "N/A")
 
