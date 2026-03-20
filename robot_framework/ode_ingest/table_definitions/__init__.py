@@ -1,3 +1,20 @@
+"""Table definitions for KMD Opus ODE Debitor data.
+
+This module consolidates all table schema definitions from various domain modules
+(bilag, aftaler, rim, betalinger, stamdata) and provides centralized dictionaries
+used throughout the application for type conversion, validation, and SQL generation.
+
+The definitions use a dataclass-based approach (TableDefinition) to maintain
+schema information including:
+- Column data types (SQLAlchemy types)
+- Primary keys
+- Date columns requiring special handling
+- Column aliases for renamed fields
+- Metadata columns added during ingestion
+
+Usage:
+    from robot_framework.ode_ingest.table_definitions import data_types, table_keys
+"""
 from typing import List
 from .common import TableDefinition, metadata_columns
 
@@ -16,13 +33,13 @@ _all_definitions.extend(rim.definitions)
 _all_definitions.extend(betalinger.definitions)
 _all_definitions.extend(stamdata.definitions)
 
-# 2. Generate the centralized structures used by the application
-# This maintains backward compatibility with existing variable names
+# 2. Generate convenient dictionary interfaces from TableDefinition objects
+# These provide backward-compatible access patterns used throughout the codebase
 
 # The master list of table names (The "Single Source of Truth" list)
 ALL_TABLE_NAMES = [d.name for d in _all_definitions]
 
-# Legacy dictionaries (auto-generated from the objects)
+# Flattened dictionaries (auto-generated from TableDefinition objects)
 table_keys = {d.name: d.keys for d in _all_definitions}
 table_used_columns = {d.name: d.used_columns for d in _all_definitions}
 table_column_alias = {d.name: d.column_aliases for d in _all_definitions if d.column_aliases}

@@ -1,3 +1,9 @@
+"""Table definitions for payment tables (betalinger).
+
+This module defines schema for payment-related tables:
+- Indbetalinger: Incoming payments
+- Rykker: Payment reminders/dunning notices
+"""
 from sqlalchemy import String, Date, Numeric, Integer
 from .common import TableDefinition
 

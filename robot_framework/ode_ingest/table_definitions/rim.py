@@ -1,3 +1,10 @@
+"""Table definitions for installment agreement tables (RIM - Rateindbetaling).
+
+This module defines schema for installment payment agreements:
+- RIM-aftale: Main installment agreement records
+- RIM-aftale-rater: Individual installment/payment schedules
+- RIM-aftale-renter: Interest calculations for installments
+"""
 from sqlalchemy import String, Date, Numeric, Integer
 from .common import TableDefinition
 

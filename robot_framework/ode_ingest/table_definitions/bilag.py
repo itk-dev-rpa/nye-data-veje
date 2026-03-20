@@ -1,3 +1,10 @@
+"""Table definitions for invoice/document tables (bilag).
+
+This module defines schema for invoice-related tables:
+- Bilag-master: Master invoice records
+- Bilag-aaben: Open invoices
+- Bilag-lukket: Closed invoices
+"""
 from sqlalchemy import String, Date, Numeric, Integer
 from .common import TableDefinition
 

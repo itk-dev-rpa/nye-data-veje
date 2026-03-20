@@ -1,3 +1,13 @@
+"""Table definitions for agreement-related tables (aftaler).
+
+This module defines schema for various agreement types in the ODE system:
+- Aftaleindhold: Agreement content/details
+- BO-aftale: Bankruptcy (Bobehandling) agreements
+- BO-aftale-haendelse: Bankruptcy agreement events
+- FP-aftale: Payment plan (Forretningspartner) agreements
+- UU-aftale: Debt collection (Udbetalingsudvikling) agreements
+- UU-aftale-haefter: Debt collection guarantors/co-debtors
+"""
 from sqlalchemy import String, Date, Numeric, Integer
 from .common import TableDefinition
 

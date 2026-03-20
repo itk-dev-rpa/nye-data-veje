@@ -1,3 +1,10 @@
+"""Table definitions for master data tables (stamdata).
+
+This module defines schema for master/reference data tables:
+- Forretningspartner: Business partner/customer master data
+- Opsaetning-Aftalekontotype: Agreement account type configuration
+- Opsaetning-Rykkerniveau: Reminder/dunning level configuration
+"""
 from sqlalchemy import String, Date, Numeric, Integer
 from .common import TableDefinition
 
