@@ -164,7 +164,7 @@ dmypy.json
 NOTES.md
 docs/
 data_profiles
-sql_transforms/
 transform_validation.json
+/robot_framework/ode_ingest/sql_transforms/
 
 .vscode/
