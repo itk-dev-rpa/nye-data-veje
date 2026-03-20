@@ -165,6 +165,6 @@ NOTES.md
 docs/
 data_profiles
 transform_validation.json
-/robot_framework/ode_ingest/sql_transforms/
+robot_framework/ode_ingest/sql_transforms/
 
 .vscode/
