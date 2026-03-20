@@ -10,7 +10,6 @@ from .common import TableDefinition
 indbetalinger = TableDefinition(
     name="Indbetalinger",
     keys=["Art_kilde", "Betalingsidentifikator", "Løbenummer"],
-    date_columns="Oprettet_den",
     column_aliases={
         'Bilagstype': 'Bilagsart'
     },
@@ -30,7 +29,6 @@ indbetalinger = TableDefinition(
 rykker = TableDefinition(
     name="Rykker",
     keys=["Dato-ID", "Identifikation", "Forretningspartner", "Aftalekonto", "Rykkertæller", "Bilagsnummer", "Gentagelsesposition", "Position", "Delposition"],
-    date_columns="Udstedelsesdato",
     data_types={
         'Aftale': String(255), 'Aftalekonto_ikke_entydig': String(255), 'Aftalekonto': String(255),
         'Bilagsnummer': String(255), 'Dato-ID': Date, 'Delposition': Integer, 'Firmakode': String(255),

@@ -11,7 +11,6 @@ from .common import TableDefinition
 bilag_master = TableDefinition(
     name="Bilag-master",
     keys=["Bilagsnummer", "Gentagelsesposition", "Position", "Delposition"],
-    date_columns="Registreringsdato",
     column_aliases={
         'Bilagstype': 'Bilagsart',
         'Udligngningstype': 'Udligningstype'
@@ -42,7 +41,6 @@ bilag_master = TableDefinition(
 bilag_aaben = TableDefinition(
     name="Bilag-aaben",
     keys=None,
-    date_columns="Bogføringsdato",
     data_types={
         'Aftaleindhold': String(255), 'Aftalekonto': String(255), 'Aftalekontotype': String(255),
         'Aftalenummer': String(255), 'Aftalestatus': String(255), 'Aftaletype': String(255),
@@ -65,7 +63,6 @@ bilag_aaben = TableDefinition(
 bilag_lukket = TableDefinition(
     name="Bilag-lukket",
     keys=["Dato-ID", "Identifikation", "Intervalnummer", "Recordnummer"],
-    date_columns="Bogføringsdato",
     data_types={
         "Intervalnummer": Integer, "Recordnummer": Integer, 'Afskrivningsårsag': String(255),
         'Afskrivningsdato': Date, 'Aftaleindhold': String(255), 'Aftalekonto': String(255),

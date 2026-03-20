@@ -11,7 +11,6 @@ from .common import TableDefinition
 rim_aftale = TableDefinition(
     name="RIM-aftale",
     keys=None,
-    date_columns="Oprettet_den",
     column_aliases={
         'Trans_header-id': 'Trans_header_ID'
     },
@@ -40,7 +39,6 @@ rim_aftale = TableDefinition(
 rim_aftale_rater = TableDefinition(
     name="RIM-aftale-rater",
     keys=None,
-    date_columns="Oprettet_den",
     data_types={
         'Ændret_den': Date, 'Aftale': String(255), 'Aftalekonto': String(255), 'Aftalekontotype': String(255),
         'Aftalenummer': String(255), 'Aftalestatus': String(255), 'Aftaletype': String(255),
@@ -69,7 +67,6 @@ rim_aftale_rater = TableDefinition(
 rim_aftale_renter = TableDefinition(
     name="RIM-aftale-renter",
     keys=["Aftalenummer", "Intr-posnr"],
-    date_columns="Oprettet_den",
     data_types={
         'Ændret_den': Date, 'Afklarings_status': String(255), 'Aftalenummer': String(255),
         'Aftalestatus': String(255), 'Aftaletype': String(255), 'Basisdato_renteberegning': Date,

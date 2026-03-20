@@ -16,10 +16,9 @@ class TableDefinition:
 
     Attributes:
         name: Table name as it appears in the source files and database
-        data_types: Dictionary mapping column names to SQLAlchemy types
+        data_types: Dictionary mapping column names to SQLAlchemy types (Date columns are auto-detected from types)
         ignored_columns: Columns present in source but not imported
         keys: List of column names forming the primary key (None if no PK)
-        date_columns: Column(s) requiring date conversion and filtering
         column_aliases: Mapping of old column names to new names (for renames)
 
     Properties:
@@ -29,7 +28,6 @@ class TableDefinition:
     data_types: Dict[str, Any]  # Maps column name to SQLAlchemy type
     ignored_columns: Dict[str, Any] = field(default_factory=dict)
     keys: Optional[List[str]] = None
-    date_columns: Optional[Union[List[str], str]] = None
     column_aliases: Dict[str, str] = field(default_factory=dict)
 
     @property

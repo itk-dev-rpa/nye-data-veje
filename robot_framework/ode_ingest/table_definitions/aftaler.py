@@ -40,7 +40,6 @@ bo_aftale = TableDefinition(
 bo_aftale_haendelse = TableDefinition(
     name="BO-aftale-haendelse",
     keys=["Ekstern_reference_nøgle"],
-    date_columns=["Afskrivnings_dato", "Betalingsdato"],
     data_types={
         'Klient': String(255), 'Aftalenummer': String(255), 'Bobehandling': String(255),
         'Ekstern_reference_nøgle': String(255), 'Udtrækstype': String(255), 'Korrespondanceart': String(255),
@@ -53,7 +52,6 @@ bo_aftale_haendelse = TableDefinition(
 fp_aftale = TableDefinition(
     name="FP-aftale",
     keys=None,
-    date_columns="Oprettet_den",
     data_types={
         'AA_type': String(255), 'Ændret_den': Date, 'Aftale': String(255), 'Aftalekonto': String(255),
         'Aftalenummer': String(255), 'Aftaleposition': Integer, 'Aftalestatus': String(255),

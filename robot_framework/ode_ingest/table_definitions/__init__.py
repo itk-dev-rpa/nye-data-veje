@@ -6,9 +6,8 @@ used throughout the application for type conversion, validation, and SQL generat
 
 The definitions use a dataclass-based approach (TableDefinition) to maintain
 schema information including:
-- Column data types (SQLAlchemy types)
+- Column data types (SQLAlchemy types) - Date columns are auto-detected from types
 - Primary keys
-- Date columns requiring special handling
 - Column aliases for renamed fields
 - Metadata columns added during ingestion
 
@@ -44,8 +43,3 @@ table_keys = {d.name: d.keys for d in _all_definitions}
 table_used_columns = {d.name: d.used_columns for d in _all_definitions}
 table_column_alias = {d.name: d.column_aliases for d in _all_definitions if d.column_aliases}
 data_types = {d.name: d.data_types for d in _all_definitions}
-
-# Handle the date columns logic
-table_date_columns = {}
-for d in _all_definitions:
-    table_date_columns[d.name] = d.date_columns
