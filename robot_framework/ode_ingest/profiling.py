@@ -1,5 +1,6 @@
 """This script is used for generating profiling reports, analyzing data uploaded for nulls, types and column mismatch.
-This is meant to provide an overview and sanity check before committing to data cleaning, as well as identifying potential issues with the data."""
+This is meant to provide an overview and sanity check before committing to data cleaning, as well as identifying potential issues with the data.
+Not part of the running pipeline."""
 import json
 from pathlib import Path
 from datetime import datetime

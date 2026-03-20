@@ -6,8 +6,8 @@ from pathlib import Path
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 from sqlalchemy import create_engine
 
-from robot_framework.ode_ingest import raw_upload, run_sql_transforms, profiling, table_definitions
-from robot_framework.ode_ingest.utils import file_utils
+from robot_framework.ode_ingest import run_sql_transforms, table_definitions
+from robot_framework.ode_ingest.utils import file_utils, ingest_utils
 from robot_framework import config
 
 
@@ -74,18 +74,18 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
             # Loop through all files and add them to staging table
             for file_path in files:
                 try:
-                    df, stats = raw_upload.process_file(file_path, f"{table_name}")
+                    df, stats = ingest_utils.process_file(file_path, f"{table_name}")
                     print(f"\nLoaded file {file_path}: \n{stats}.")
                     df.to_sql(f"{table_name}_{subset}_Staging", engine, schema=config.DB_SCHEMA, if_exists='append', index=False)
                     print(f"\nStaged {table_name}_{subset}.")
                     # data_profile = profiling.profile_table(f"{table_name}_{subset}_Staging", engine, table_schema)
                     run_sql_transforms.execute_sql_file_with_validation(script_path, engine, validation_log, log_key=f"{table_name}_{subset} ({file_path.name})")
                     file_utils.move_processed_files(file_path)
-                    raw_upload.log_ingest_stats(engine, f"{table_name}_{subset}", file_path.name, stats, "Success")
+                    ingest_utils.log_ingest_stats(engine, f"{table_name}_{subset}", file_path.name, stats, "Success")
                 except Exception as e:
                     print(f"  ✗ FEJL ved behandling af {file_path.name}: {e}")
                     stats = stats if stats else {}
-                    raw_upload.log_ingest_stats(engine, f"{table_name}_{subset}", file_path.name, stats,"Fail", str(e))
+                    ingest_utils.log_ingest_stats(engine, f"{table_name}_{subset}", file_path.name, stats,"Fail", str(e))
                     break
 
                 with open(validation_log_file, 'w', encoding='utf-8') as f:
