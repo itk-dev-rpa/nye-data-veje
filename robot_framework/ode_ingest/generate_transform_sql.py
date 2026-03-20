@@ -6,7 +6,7 @@ Staging -> Backup (Raw) -> Typed (History) -> Snapshot (Current State)
 """
 from pathlib import Path
 from sqlalchemy import Integer, Date, DateTime, Numeric, String
-from robot_framework.ode_ingest import table_columns
+from robot_framework.ode_ingest import table_definitions as table_columns
 from robot_framework import config
 
 
@@ -207,8 +207,6 @@ def generate_snapshot_merge_sql(source_table: str, target_table: str,
         if not is_delta:
              return f"""
     -- 3. SNAPSHOT: Total Replacement (No PK)
-    TRUNCATE TABLE [{schema}].[{target_table}];
-    
     WITH new_data AS (
         SELECT
     {',\n'.join(conversions)}
@@ -233,8 +231,7 @@ def generate_snapshot_merge_sql(source_table: str, target_table: str,
     if not is_delta:
         # TOTAL: Replace everything
         return f"""
-    -- 3. SNAPSHOT: Total Replacement
-    TRUNCATE TABLE [{schema}].[{target_table}];
+    -- 3. SNAPSHOT: Insert total, expecting no duplicates
 
     {cte_sql}
     INSERT INTO [{schema}].[{target_table}] ({columns_clause})
@@ -261,6 +258,21 @@ def generate_snapshot_merge_sql(source_table: str, target_table: str,
     """
 
 
+def generate_validation_sql(staging_table: str, snapshot_table: str, schema: str) -> str:
+    """
+    Generate validation query to output metrics for run_sql_transforms.py.
+    Matches expectation of 'ROW_COUNTS' in the first column.
+    """
+    return f"""
+    -- D. Validation Metrics
+    ------------------------------------------------------------
+    SELECT 
+        'ROW_COUNTS' as metric,
+        (SELECT COUNT(*) FROM [{schema}].[{staging_table}]) as source_rows,
+        (SELECT COUNT(*) FROM [{schema}].[{snapshot_table}]) as target_rows;
+    """
+
+
 def generate_transform_script(table: str, suffix: str, schema_dict: dict,
                               primary_keys: list, output_dir: Path,
                               schema: str) -> Path:
@@ -268,8 +280,8 @@ def generate_transform_script(table: str, suffix: str, schema_dict: dict,
 
     full_table_name = f"{table}_{suffix}"  # e.g., Aftale_Delta
     staging_table = f"{full_table_name}_Staging"
-    backup_table = f"{table}_Backup"
-    typed_table = f"{table}_Typed"
+    backup_table = f"{full_table_name}_Backup"
+    typed_table = f"{full_table_name}_Typed"
     snapshot_table = f"{table}"  # The 'Golden Record'
 
     output_file = output_dir / f"transform_{full_table_name}.sql"
@@ -297,15 +309,20 @@ def generate_transform_script(table: str, suffix: str, schema_dict: dict,
     ------------------------------------------------------------
     
     {generate_backup_insert_sql(staging_table, backup_table, schema_dict, schema)}
+    GO
     
     {generate_typed_insert_sql(staging_table, typed_table, schema_dict, primary_keys, schema)}
+    GO
     
     {generate_snapshot_merge_sql(staging_table, snapshot_table, schema_dict, primary_keys, schema, is_delta)}
     GO
 
+    {generate_validation_sql(staging_table, snapshot_table, schema)}
+    GO
+
     -- C. Cleanup (Optional - Staging table usually kept until file move is confirmed)
-    -- DROP TABLE [{schema}].[{staging_table}];
-    -- GO
+    DROP TABLE [{schema}].[{staging_table}];
+    GO
     """
 
     with open(output_file, 'w', encoding='utf-8') as f:

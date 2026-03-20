@@ -14,7 +14,7 @@ from robot_framework import config
 
 
 def execute_sql_file_with_validation(filepath: Path, engine,
-                                     validation_log: dict) -> None:
+                                     validation_log: dict, log_key: str = None) -> None:
     """Execute SQL script and capture validation results."""
 
     print(f"\nExecuting {filepath.name}...")
@@ -23,11 +23,14 @@ def execute_sql_file_with_validation(filepath: Path, engine,
         sql_content = f.read()
 
     # Split by GO statements
-    batches = [batch.strip() for batch in sql_content.split('\nGO\n') if batch.strip()]
-
-    table_name = filepath.stem.replace('transform_', '')
-    validation_log[table_name] = {
+    batches = [batch.strip() for batch in sql_content.split('GO\n') if batch.strip()]
+    if log_key:
+        entry_name = log_key
+    else:
+        entry_name = filepath.stem.replace('transform_', '')
+    validation_log[entry_name] = {
         'executed_at': datetime.now().isoformat(),
+        'script': filepath.name,
         'status': 'in_progress',
         'issues': []
     }
@@ -55,7 +58,7 @@ def execute_sql_file_with_validation(filepath: Path, engine,
                             # NULL in primary key report
                             if len(rows) > 0 and 'NULL_IN_PRIMARY_KEY' in str(first_row):
                                 print(f"  ⚠ Found {len(rows)} rows with NULL in primary key")
-                                validation_log[table_name]['issues'].append({
+                                validation_log[entry_name]['issues'].append({
                                     'type': 'null_in_primary_key',
                                     'count': len(rows),
                                     'sample': [dict(row._mapping) for row in rows[:5]]
@@ -71,7 +74,7 @@ def execute_sql_file_with_validation(filepath: Path, engine,
                                     if excluded > 0:
                                         print(f"  ⚠ Excluded rows: {excluded}")
 
-                                validation_log[table_name]['row_counts'] = row_dict
+                                validation_log[entry_name]['row_counts'] = row_dict
 
                     connection.commit()
                 except Exception:
@@ -80,11 +83,11 @@ def execute_sql_file_with_validation(filepath: Path, engine,
 
             except Exception as exc:
                 print(f"  ✗ Error in batch {i}: {exc}")
-                validation_log[table_name]['status'] = 'failed'
-                validation_log[table_name]['error'] = str(exc)
+                validation_log[entry_name]['status'] = 'failed'
+                validation_log[entry_name]['error'] = str(exc)
                 raise
 
-    validation_log[table_name]['status'] = 'completed'
+    validation_log[entry_name]['status'] = 'completed'
     print(f"  ✓ {filepath.name} completed")
 
 

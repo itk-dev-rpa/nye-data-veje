@@ -4,6 +4,7 @@ file_utils.py
 File system utility functions for finding and handling files.
 """
 import re
+import tomllib
 from pathlib import Path
 from os import path
 import shutil
@@ -11,7 +12,7 @@ from typing import List, Tuple, Optional
 from datetime import datetime
 
 
-def find_files(directory: str, partial_name: str) -> List[str]:
+def find_files(directory: str, partial_name: str) -> List[Path]:
     """
     Return files from a directory whose names contain a given partial string.
 
@@ -25,7 +26,7 @@ def find_files(directory: str, partial_name: str) -> List[str]:
     files = []
     for filename in Path(directory).iterdir():
         if partial_name in filename.name:
-            files.append(str(filename))
+            files.append(filename)
     return files
 
 
@@ -61,6 +62,10 @@ def _extract_sequence_number(filename: str) -> int:
     Returns:
         Sequence number (002 in example) or 0 if not found
     """
+    split_pattern = r'_(\d+)af\d+'
+    match_split = re.search(split_pattern, filename)
+    if match_split:
+        return int(match_split.group(1))
     seq_pattern = r'_(\d{3})_'
     match = re.search(seq_pattern, filename)
 
@@ -109,3 +114,17 @@ def sort_files(file_paths: List[Path]) -> List[Path]:
 def move_processed_files(filepath: Path, processed_path: str = "processed_files"):
     directory, filename = path.split(filepath)
     shutil.move(filepath, path.join(directory, processed_path, filename))
+
+
+def get_project_version() -> str:
+    """Finder projektets rod ved at lede efter pyproject.toml opad i stien."""
+    current_path = Path(__file__).resolve()
+
+    # Tjek nuværende mappe og alle forældremapper
+    for path in [current_path] + list(current_path.parents):
+        if (path / "pyproject.toml").exists():
+            with open(path / "pyproject.toml", "rb") as f:
+                toml_data = tomllib.load(f)
+                return toml_data.get("project", {}).get("version", "N/A")
+
+    raise FileNotFoundError("Kunne ikke finde pyproject.toml i nogen forældremapper.")

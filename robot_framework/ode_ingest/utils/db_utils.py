@@ -10,7 +10,7 @@ import pandas as pd
 from sqlalchemy import create_engine, text, Engine, Table, MetaData, PrimaryKeyConstraint, Column, String, Date, Numeric, Integer
 from sqlalchemy.exc import SQLAlchemyError
 from robot_framework import config
-from robot_framework.ode_ingest.table_columns import table_keys, table_used_columns, data_types
+from robot_framework.ode_ingest.table_definitions import table_keys, table_used_columns, data_types
 
 type_mapping = {
     'text': String(255),

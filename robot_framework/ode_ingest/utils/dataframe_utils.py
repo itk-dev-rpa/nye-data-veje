@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import Engine, Date, Numeric, Integer
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
-from robot_framework.ode_ingest.table_columns import table_keys, table_used_columns, data_types
+from robot_framework.ode_ingest.table_definitions import table_keys, table_used_columns, data_types
 from robot_framework.ode_ingest.utils.date_utils import DateRangeColumn
 from robot_framework.ode_ingest.utils import date_utils, number_utils
 from robot_framework import config

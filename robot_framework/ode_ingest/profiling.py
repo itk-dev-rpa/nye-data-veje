@@ -12,7 +12,7 @@ from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConn
 
 from robot_framework import config
 from robot_framework.ode_ingest.utils import date_utils, number_utils, dataframe_utils
-from robot_framework.ode_ingest.table_columns import table_keys
+from robot_framework.ode_ingest.table_definitions import table_keys
 
 
 def sqlalchemy_to_display_type(sa_type: TypeEngine) -> str:
@@ -194,7 +194,7 @@ def profile_all_tables(tables: list[str], engine, data_types: dict,
 
 # Usage
 if __name__ == "__main__":
-    from robot_framework.ode_ingest import table_columns
+    from robot_framework.ode_ingest import table_definitions as table_columns
     import os
 
     conn_string = os.getenv("OpenOrchestratorConnString")
