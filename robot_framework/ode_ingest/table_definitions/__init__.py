@@ -15,7 +15,8 @@ Usage:
     from robot_framework.ode_ingest.table_definitions import data_types, table_keys
 """
 from typing import List
-from .common import TableDefinition, metadata_columns
+from sqlalchemy import String, Date, Integer
+from .common import TableDefinition
 
 # Import definition groups
 from . import bilag
@@ -43,3 +44,11 @@ table_keys = {d.name: d.keys for d in _all_definitions}
 table_used_columns = {d.name: d.used_columns for d in _all_definitions}
 table_column_alias = {d.name: d.column_aliases for d in _all_definitions if d.column_aliases}
 data_types = {d.name: d.data_types for d in _all_definitions}
+
+# Metadata columns added to all tables during ingestion
+metadata_columns = {
+    'export_date': Date,         # Date extracted from filename (YYYY-MM-DD)
+    'file_origin': String(255),  # Original filename
+    'row_number': Integer,       # Row number within the file
+    'etl_version': String(50)    # Version from pyproject.toml
+}

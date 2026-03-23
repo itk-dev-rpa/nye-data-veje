@@ -94,7 +94,6 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                     json.dump(validation_log, f, indent=2)
 
 
-
 if __name__ == "__main__":
     conn_string = os.getenv("OpenOrchestratorConnString")
     crypto_key = os.getenv("OpenOrchestratorKey")

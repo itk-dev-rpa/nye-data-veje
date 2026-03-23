@@ -158,8 +158,8 @@ def get_column_list(table_name: str, engine: Engine) -> list[str]:
     with engine.connect() as conn:
         result = conn.execute(
             text(f"""
-                SELECT COLUMN_NAME 
-                FROM INFORMATION_SCHEMA.COLUMNS 
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_SCHEMA = '{config.DB_SCHEMA}'
                 AND TABLE_NAME = '{table_name}'
                 ORDER BY ORDINAL_POSITION

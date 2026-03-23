@@ -1,11 +1,11 @@
-"""Common table definition structures and metadata columns.
+"""Common table definition structures.
 
-This module provides the base dataclass for table definitions and common
-metadata columns that are added to all tables during ingestion.
+This module provides the base dataclass for table definitions used
+throughout the ODE ingestion pipeline.
 """
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any
-from sqlalchemy import String, Date, Integer
+
 
 @dataclass
 class TableDefinition:
@@ -34,11 +34,3 @@ class TableDefinition:
     def used_columns(self) -> List[str]:
         """Returns the list of columns to be imported, derived from data_types keys."""
         return list(self.data_types.keys())
-
-# Common metadata columns added to all tables during ingestion
-metadata_columns = {
-    'export_date': Date,         # Date extracted from filename (YYYY-MM-DD)
-    'file_origin': String(255),  # Original filename
-    'row_number': Integer,       # Row number within the file
-    'etl_version': String(50)    # Version from pyproject.toml
-}

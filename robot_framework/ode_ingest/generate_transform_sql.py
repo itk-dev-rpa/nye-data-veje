@@ -349,7 +349,7 @@ def generate_validation_sql(staging_table: str, snapshot_table: str, schema: str
     return f"""
     -- D. Validation Metrics
     ------------------------------------------------------------
-    SELECT 
+    SELECT
         'ROW_COUNTS' as metric,
         (SELECT COUNT(*) FROM [{schema}].[{staging_table}]) as source_rows,
         (SELECT COUNT(*) FROM [{schema}].[{snapshot_table}]) as target_rows;
