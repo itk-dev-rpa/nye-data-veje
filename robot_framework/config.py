@@ -18,3 +18,5 @@ ENCODINGS = ['utf-8', 'latin-1', 'cp1252']
 DATE_FORMATS = [
     '%d-%m-%Y', '%d/%m/%Y', '%Y%m%d', '%Y-%m-%d', '%d.%m.%Y', '%d-%m-%y', '%d/%m/%y',
 ]
+
+TABLES_TO_PROCESS = None  # None = all, eller en liste

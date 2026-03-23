@@ -18,27 +18,6 @@ from robot_framework.ode_ingest.utils import file_utils, ingest_utils
 from robot_framework import config
 
 
-tables = [  # List of tables to work on
-    "Aftaleindhold",
-    "BO-aftale-haendelse",
-    "BO-aftale",
-    "Bilag-aaben",
-    "Bilag-master",
-    "FP-aftale",
-    "Bilag-lukket",
-    "Forretningspartner",
-    "Indbetalinger",
-    "Opsaetning-Aftalekontotype",
-    "Opsaetning-Rykkerniveau",
-    "RIM-aftale-rater",
-    "RIM-aftale-renter",
-    "RIM-aftale",
-    "Rykker",
-    "UU-aftale-haefter",
-    "UU-aftale",
-]
-
-
 def process(orchestrator_connection: OrchestratorConnection) -> None:
     """Execute the complete ETL pipeline for all configured tables.
 
@@ -70,7 +49,8 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
             print("Kunne ikke læse eksisterende logfil (muligvis tom eller korrupt). Starter ny.")
 
     directory = orchestrator_connection.get_constant(config.DATA_DIRECTORY).value
-    for table_name in tables:
+    tables_to_process = config.TABLES_TO_PROCESS or table_definitions.ALL_TABLE_NAMES
+    for table_name in tables_to_process:
         table_schema = table_definitions.data_types.get(table_name, {})
         table_schema.update(table_definitions.metadata_columns)
         primary_keys = table_definitions.table_keys.get(table_name, [])
@@ -104,7 +84,7 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
 
                     file_utils.move_processed_files(file_path)
                     ingest_utils.log_ingest_stats(engine, f"{table_name}_{subset}", file_path.name, stats, "Success")
-                except Exception as e:
+                except Exception as e:  # pylint: disable=broad-exception-caught
                     print(f"  ✗ FEJL ved behandling af {file_path.name}: {e}")
                     stats = stats if stats else {}
                     ingest_utils.log_ingest_stats(engine, f"{table_name}_{subset}", file_path.name, stats,"Fail", str(e))
