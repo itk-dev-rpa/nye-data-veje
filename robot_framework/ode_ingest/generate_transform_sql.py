@@ -499,9 +499,12 @@ def generate_all_transform_scripts(tables: list[str], data_types: dict,
 if __name__ == "__main__":
     all_tables = list(table_columns.data_types.keys())
 
+    # Generate scripts in the sql_transforms directory relative to this file
+    script_dir = Path(__file__).parent / 'sql_transforms'
+
     generate_all_transform_scripts(
         all_tables,
         table_columns.data_types,
         table_columns.table_keys,
-        output_dir=Path('sql_transforms')
+        output_dir=script_dir
     )
