@@ -13,7 +13,7 @@ from pathlib import Path
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 from sqlalchemy import create_engine
 
-from robot_framework.ode_ingest import run_sql_transforms, table_definitions, generate_transform_sql
+from robot_framework.ode_ingest import run_sql_transforms, table_definitions, generate_transform_sql  # pylint: disable=no-name-in-module
 from robot_framework.ode_ingest.utils import file_utils, ingest_utils
 from robot_framework import config
 

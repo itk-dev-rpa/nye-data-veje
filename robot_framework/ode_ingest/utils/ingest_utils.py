@@ -86,5 +86,5 @@ def log_ingest_stats(engine, table_name: str, filename: str, stats: dict, status
                 "err": error
             })
             conn.commit()
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Warning: Could not write to log table: {e}")

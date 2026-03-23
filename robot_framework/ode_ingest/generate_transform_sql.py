@@ -205,6 +205,9 @@ def generate_typed_insert_sql(source_table: str, target_table: str,
 
     if primary_keys:
         pk_partition = ', '.join([f'[{pk}]' for pk in primary_keys])
+        pk_null_check = ' AND '.join([f'[{pk}] IS NOT NULL' for pk in primary_keys])
+        select_columns = ',\n    '.join([f'[{col}]' for col in column_names])
+        conversions_str = ',\n'.join(conversions)
         # We filter out rows where PK becomes NULL after conversion
 
         return f"""
@@ -212,30 +215,31 @@ def generate_typed_insert_sql(source_table: str, target_table: str,
     --    Note: Rows with invalid Primary Keys after conversion are skipped here but exist in Backup.
     WITH transformed_data AS (
         SELECT
-    {',\n'.join(conversions)}
+    {conversions_str}
         FROM [{schema}].[{source_table}]
     ),
     valid_data AS (
         SELECT *,
             ROW_NUMBER() OVER (PARTITION BY {pk_partition} ORDER BY (SELECT NULL)) as rn
         FROM transformed_data
-        WHERE {' AND '.join([f'[{pk}] IS NOT NULL' for pk in primary_keys])}
+        WHERE {pk_null_check}
     )
     INSERT INTO [{schema}].[{target_table}] (
         {columns_clause}
     )
     SELECT
-        {',\n    '.join([f'[{col}]' for col in column_names])}
+        {select_columns}
     FROM valid_data
     WHERE rn = 1;
     """
+    conversions_str = ',\n'.join(conversions)
     return f"""
     -- 2. TYPED: Transform and insert (No PK defined)
     INSERT INTO [{schema}].[{target_table}] (
         {columns_clause}
     )
     SELECT
-    {',\n'.join(conversions)}
+    {conversions_str}
     FROM [{schema}].[{source_table}];
     """
 
