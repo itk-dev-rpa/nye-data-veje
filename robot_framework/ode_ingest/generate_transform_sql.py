@@ -267,13 +267,13 @@ def generate_snapshot_merge_sql(*, source_table: str, target_table: str,
     column_names = list(schema_dict.keys())
     conversions = [generate_column_conversion(col, dtype) for col, dtype in schema_dict.items()]
     columns_clause = ', '.join([f'[{col}]' for col in column_names])
-
+    conversion_string = ',\n'.join(conversions)
     # Common CTE to get clean data from staging for the snapshot update
     cte_sql = f"""
     WITH new_data AS (
         SELECT * FROM (
             SELECT
-    {',\n'.join(conversions)},
+    {conversion_string},
                 ROW_NUMBER() OVER (PARTITION BY {', '.join([f'[{pk}]' for pk in primary_keys])} ORDER BY (SELECT NULL)) as rn
             FROM [{schema}].[{source_table}]
         ) t WHERE rn = 1 AND {' AND '.join([f'[{pk}] IS NOT NULL' for pk in primary_keys])}

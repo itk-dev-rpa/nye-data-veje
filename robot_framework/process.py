@@ -83,11 +83,11 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                     )
 
                     file_utils.move_processed_files(file_path)
-                    ingest_utils.log_ingest_stats(engine, f"{table_name}_{subset}", file_path.name, stats, "Success")
+                    ingest_utils.log_ingest_stats(engine=engine, table_name="{table_name}_{subset}", filename=file_path.name, stats=stats, status="Success")
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     print(f"  ✗ FEJL ved behandling af {file_path.name}: {e}")
                     stats = stats if stats else {}
-                    ingest_utils.log_ingest_stats(engine, f"{table_name}_{subset}", file_path.name, stats,"Fail", str(e))
+                    ingest_utils.log_ingest_stats(engine=engine, table_name=f"{table_name}_{subset}", filename=file_path.name, stats=stats, status="Fail", error=str(e))
                     break
 
                 with open(validation_log_file, 'w', encoding='utf-8') as f:

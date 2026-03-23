@@ -58,7 +58,7 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     return df, stats
 
 
-def log_ingest_stats(engine, table_name: str, filename: str, stats: dict, status: str, error: str = None):
+def log_ingest_stats(*, engine, table_name: str, filename: str, stats: dict, status: str, error: str = None):
     """Write ingestion statistics to SQL log table.
 
     Args:
