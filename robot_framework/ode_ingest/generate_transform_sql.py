@@ -476,7 +476,7 @@ def generate_all_transform_scripts(tables: list[str], data_types: dict,
             script_file = generate_transform_script(
                 table=table, suffix=suffix, schema_dict=schema, primary_keys=keys or [], output_dir=output_dir, schema=config.DB_SCHEMA
             )
-            print(f"  ✓ {script_file.name}")
+            print(f"  OK {script_file.name}")
 
             summary.append({
                 'table': table,
@@ -493,7 +493,7 @@ def generate_all_transform_scripts(tables: list[str], data_types: dict,
         for item in summary:
             f.write(f"{item['script']:<45} | {item['pk']}\n")
 
-    print(f"\n✓ All scripts generated in {output_dir}")
+    print(f"\nAll scripts generated in {output_dir}")
 
 
 if __name__ == "__main__":
