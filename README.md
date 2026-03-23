@@ -178,13 +178,10 @@ Scripts will be written to `robot_framework/ode_ingest/sql_transforms/` (git-ign
 - **Python 3.11+**
 - **SQLAlchemy** - Database abstraction and type definitions
 - **Pandas** - DataFrame operations
-- **OpenOrchestrator** - RPA framework for credential management
+- **OpenOrchestrator** - RPA framework for credential management and dependency installation
 - **SQL Server** - Target data warehouse
 
-Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+Dependencies are defined in `pyproject.toml` and automatically installed by OpenOrchestrator when the robot runs.
 
 ## Design Principles
 
