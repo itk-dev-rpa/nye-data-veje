@@ -4,7 +4,7 @@ This module provides the base dataclass for table definitions and common
 metadata columns that are added to all tables during ingestion.
 """
 from dataclasses import dataclass, field
-from typing import Optional, Dict, List, Any, Union
+from typing import Optional, Dict, List, Any
 from sqlalchemy import String, Date, Integer
 
 @dataclass

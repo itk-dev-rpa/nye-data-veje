@@ -136,11 +136,12 @@ def generate_create_table_sql(table_name: str, schema_dict: dict,
         pk_constraint = f",\n    CONSTRAINT [PK_{table_name}] PRIMARY KEY CLUSTERED ({pk_cols})"
 
     # Use IF NOT EXISTS to allow appending to existing Backup/Typed tables
+    columns_str = ',\n'.join(columns)
     return f"""
     IF OBJECT_ID('[{schema}].[{table_name}]', 'U') IS NULL
     BEGIN
         CREATE TABLE [{schema}].[{table_name}] (
-    {',\n'.join(columns)}{pk_constraint}
+    {columns_str}{pk_constraint}
         );
     END
     """
@@ -228,8 +229,7 @@ def generate_typed_insert_sql(source_table: str, target_table: str,
     FROM valid_data
     WHERE rn = 1;
     """
-    else:
-        return f"""
+    return f"""
     -- 2. TYPED: Transform and insert (No PK defined)
     INSERT INTO [{schema}].[{target_table}] (
         {columns_clause}
@@ -240,7 +240,7 @@ def generate_typed_insert_sql(source_table: str, target_table: str,
     """
 
 
-def generate_snapshot_merge_sql(source_table: str, target_table: str,
+def generate_snapshot_merge_sql(*, source_table: str, target_table: str,
                                 schema_dict: dict, primary_keys: list,
                                 schema: str, is_delta: bool) -> str:
     """Generate MERGE/INSERT statement for Snapshot table (current state).
@@ -278,12 +278,8 @@ def generate_snapshot_merge_sql(source_table: str, target_table: str,
     if not primary_keys:
         # Without PK, we can only append.
         # If Total, we truncate first. If Delta, we just append.
-        op_sql = f"""
-        INSERT INTO [{schema}].[{target_table}] ({columns_clause})
-        SELECT {columns_clause} FROM new_data;
-        """
         if not is_delta:
-             return f"""
+            return f"""
     -- 3. SNAPSHOT: Total Replacement (No PK)
     WITH new_data AS (
         SELECT
@@ -293,8 +289,7 @@ def generate_snapshot_merge_sql(source_table: str, target_table: str,
     INSERT INTO [{schema}].[{target_table}] ({columns_clause})
     SELECT {columns_clause} FROM new_data;
     """
-        else:
-            return f"""
+        return f"""
     -- 3. SNAPSHOT: Delta Append (No PK)
     WITH new_data AS (
         SELECT
@@ -315,14 +310,14 @@ def generate_snapshot_merge_sql(source_table: str, target_table: str,
     INSERT INTO [{schema}].[{target_table}] ({columns_clause})
     SELECT {columns_clause} FROM new_data;
     """
-    else:
-        # DELTA: Merge
-        pk_join = ' AND '.join([f'target.[{pk}] = source.[{pk}]' for pk in primary_keys])
-        update_cols = ', '.join([f'target.[{col}] = source.[{col}]'
-                                 for col in column_names if col not in primary_keys])
-        values_clause = ', '.join([f'source.[{col}]' for col in column_names])
 
-        return f"""
+    # DELTA: Merge
+    pk_join = ' AND '.join([f'target.[{pk}] = source.[{pk}]' for pk in primary_keys])
+    update_cols = ', '.join([f'target.[{col}] = source.[{col}]'
+                             for col in column_names if col not in primary_keys])
+    values_clause = ', '.join([f'source.[{col}]' for col in column_names])
+
+    return f"""
     -- 3. SNAPSHOT: Delta Merge (Upsert)
     {cte_sql}
     MERGE INTO [{schema}].[{target_table}] AS target
@@ -377,15 +372,13 @@ def generate_transform_script_string(table: str, suffix: str, schema_dict: dict,
     typed_table = f"{full_table_name}_Typed"
     snapshot_table = f"{table}"  # The 'Golden Record'
 
-    is_delta = (suffix == "Delta")
+    is_delta = suffix == "Delta"
 
     script = f"""
-    -- ============================================================
     -- Pipeline Script for {table} ({suffix})
     -- Source:  {staging_table}
     -- Targets: {backup_table}, {typed_table}, {snapshot_table}
     -- Generated automatically
-    -- ============================================================
 
     USE [{config.DB_NAME}];
     GO
@@ -406,7 +399,7 @@ def generate_transform_script_string(table: str, suffix: str, schema_dict: dict,
     {generate_typed_insert_sql(staging_table, typed_table, schema_dict, primary_keys, schema)}
     GO
 
-    {generate_snapshot_merge_sql(staging_table, snapshot_table, schema_dict, primary_keys, schema, is_delta)}
+    {generate_snapshot_merge_sql(source_table=staging_table, target_table=snapshot_table, schema_dict=schema_dict, primary_keys=primary_keys, schema=schema, is_delta=is_delta)}
     GO
 
     {generate_validation_sql(staging_table, snapshot_table, schema)}
@@ -420,7 +413,7 @@ def generate_transform_script_string(table: str, suffix: str, schema_dict: dict,
     return script
 
 
-def generate_transform_script(table: str, suffix: str, schema_dict: dict,
+def generate_transform_script(*, table: str, suffix: str, schema_dict: dict,
                               primary_keys: list, output_dir: Path,
                               schema: str) -> Path:
     """Generate complete transformation SQL script and write to file.
@@ -481,7 +474,7 @@ def generate_all_transform_scripts(tables: list[str], data_types: dict,
         for suffix in ["Total", "Delta"]:
             print(f"Generating pipeline script for {table} ({suffix})...")
             script_file = generate_transform_script(
-                table, suffix, schema, keys or [], output_dir, config.DB_SCHEMA
+                table=table, suffix=suffix, schema_dict=schema, primary_keys=keys or [], output_dir=output_dir, schema=config.DB_SCHEMA
             )
             print(f"  ✓ {script_file.name}")
 

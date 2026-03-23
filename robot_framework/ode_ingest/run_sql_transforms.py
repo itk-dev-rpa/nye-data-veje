@@ -4,14 +4,51 @@ This module executes the generated SQL transformation scripts and captures
 validation metrics including row counts, data quality issues, and execution status.
 Results are logged to a JSON file for auditing and troubleshooting.
 """
-from pathlib import Path
-from sqlalchemy import create_engine, text
 import os
 import json
+from pathlib import Path
 from datetime import datetime
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError, ResourceClosedError
 
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 from robot_framework import config
+
+
+def _process_validation_results(rows, log_key: str, validation_log: dict) -> None:
+    """Process validation query results and log metrics.
+
+    Args:
+        rows: Query result rows
+        log_key: Key for validation log entry
+        validation_log: Dictionary to store validation results
+    """
+    if not rows:
+        return
+
+    first_row = rows[0]
+
+    # NULL in primary key report
+    if 'NULL_IN_PRIMARY_KEY' in str(first_row):
+        print(f"  ⚠ Found {len(rows)} rows with NULL in primary key")
+        validation_log[log_key]['issues'].append({
+            'type': 'null_in_primary_key',
+            'count': len(rows),
+            'sample': [dict(row._mapping) for row in rows[:5]]  # pylint: disable=protected-access
+        })
+
+    # Row count metrics
+    elif 'ROW_COUNTS' in str(first_row):
+        row_dict = dict(first_row._mapping)  # pylint: disable=protected-access
+        print(f"  Source rows: {row_dict.get('source_rows', 'N/A')}")
+        print(f"  Target rows: {row_dict.get('target_rows', 'N/A')}")
+        if 'excluded_rows' in row_dict:
+            excluded = row_dict['excluded_rows']
+            if excluded > 0:
+                print(f"  ⚠ Excluded rows: {excluded}")
+
+        validation_log[log_key]['row_counts'] = row_dict
 
 
 def execute_sql_string_with_validation(sql_content: str, engine,
@@ -54,48 +91,25 @@ def execute_sql_string_with_validation(sql_content: str, engine,
         with engine.begin() as connection:
             try:
                 result = connection.execute(text(batch))
-                try:
-                    # Capture results from SELECT statements
-                    if batch.strip().upper().startswith(('SELECT', 'WITH')):
+                # Capture results from SELECT statements
+                if batch.strip().upper().startswith(('SELECT', 'WITH')):
+                    try:
                         rows = result.fetchall()
-                        if rows:
-                            # Check if it's a validation query
-                            first_row = rows[0]
+                        _process_validation_results(rows, log_key, validation_log)
+                    except ResourceClosedError:
+                        # Some queries don't return results (INSERT, CREATE, etc)
+                        pass
 
-                            # NULL in primary key report
-                            if len(rows) > 0 and 'NULL_IN_PRIMARY_KEY' in str(first_row):
-                                print(f"  ⚠ Found {len(rows)} rows with NULL in primary key")
-                                validation_log[log_key]['issues'].append({
-                                    'type': 'null_in_primary_key',
-                                    'count': len(rows),
-                                    'sample': [dict(row._mapping) for row in rows[:5]]
-                                })
+                connection.commit()
 
-                            # Row count metrics
-                            elif 'ROW_COUNTS' in str(first_row):
-                                row_dict = dict(first_row._mapping)
-                                print(f"  Source rows: {row_dict.get('source_rows', 'N/A')}")
-                                print(f"  Target rows: {row_dict.get('target_rows', 'N/A')}")
-                                if 'excluded_rows' in row_dict:
-                                    excluded = row_dict['excluded_rows']
-                                    if excluded > 0:
-                                        print(f"  ⚠ Excluded rows: {excluded}")
-
-                                validation_log[log_key]['row_counts'] = row_dict
-
-                    connection.commit()
-                except Exception:
-                    # Some queries don't return results (INSERT, CREATE, etc)
-                    pass
-
-            except Exception as exc:
+            except SQLAlchemyError as exc:
                 print(f"  ✗ Error in batch {i}: {exc}")
                 validation_log[log_key]['status'] = 'failed'
                 validation_log[log_key]['error'] = str(exc)
                 raise
 
     validation_log[log_key]['status'] = 'completed'
-    print(f"  ✓ Transformation completed")
+    print("  ✓ Transformation completed")
 
 
 def execute_sql_file_with_validation(filepath: Path, engine,
@@ -147,7 +161,7 @@ def run_all_transforms(sql_dir: Path, oc,
     validation_log = {}
 
     # Run table transformation scripts
-    table_scripts = sorted([f for f in sql_dir.glob("transform_*.sql")])
+    table_scripts = sorted(list(sql_dir.glob("transform_*.sql")))
 
     print(f"Found {len(table_scripts)} table transformation scripts\n")
     print("="*70)
@@ -155,7 +169,7 @@ def run_all_transforms(sql_dir: Path, oc,
     for script_file in table_scripts:
         try:
             execute_sql_file_with_validation(script_file, engine, validation_log)
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             print(f"\n✗ Failed to execute {script_file.name}")
             print(f"  Error: {exc}")
 
@@ -202,13 +216,13 @@ def run_all_transforms(sql_dir: Path, oc,
 if __name__ == "__main__":
     conn_string = os.getenv("OpenOrchestratorConnString")
     crypto_key = os.getenv("OpenOrchestratorKey")
-    oc = OrchestratorConnection("ODE test", conn_string, crypto_key, "")
+    oc_main = OrchestratorConnection("ODE test", conn_string, crypto_key, "")
 
-    sql_dir = Path('sql_transforms')
+    sql_dir_main = Path('sql_transforms')
 
-    connection_string = oc.get_constant(config.DB_CONNECTION).value
-    engine = create_engine(connection_string)
-    execute_sql_file_with_validation(Path("sql_transforms/transform_RIM-aftale-rater_Delta.sql"), engine, {})
+    conn_str = oc_main.get_constant(config.DB_CONNECTION).value
+    db_engine = create_engine(conn_str)
+    execute_sql_file_with_validation(Path("sql_transforms/transform_RIM-aftale-rater_Delta.sql"), db_engine, {})
     # if not sql_dir.exists():
     #     print(f"Error: Directory {sql_dir} not found")
     #     print("Run generate_transform_sql.py first to generate scripts")

@@ -68,7 +68,7 @@ def convert_number_series(series: pd.Series) -> pd.Series:
     else:
         # Remove thousand separators, convert to integer
         converted = pd.to_numeric(
-            series_cleaned.str.replace(".", "", regex=False), 
+            series_cleaned.str.replace(".", "", regex=False),
             errors='coerce'
         )
         converted = converted.astype('Int64')  # Nullable integer
