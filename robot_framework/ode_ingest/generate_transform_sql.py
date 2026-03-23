@@ -10,7 +10,7 @@ The generated SQL scripts handle:
 - Table creation with appropriate data types
 - Type conversion and data cleaning
 - Deduplication based on primary keys
-- Total (full replace) vs Delta (merge/upsert) logic
+- Total (full replace) vs. Delta (merge/upsert) logic
 """
 from pathlib import Path
 from sqlalchemy import Integer, Date, DateTime, Numeric, String
@@ -287,7 +287,7 @@ def generate_snapshot_merge_sql(*, source_table: str, target_table: str,
     -- 3. SNAPSHOT: Total Replacement (No PK)
     WITH new_data AS (
         SELECT
-    {',\n'.join(conversions)}
+    {conversion_string}
         FROM [{schema}].[{source_table}]
     )
     INSERT INTO [{schema}].[{target_table}] ({columns_clause})
@@ -297,7 +297,7 @@ def generate_snapshot_merge_sql(*, source_table: str, target_table: str,
     -- 3. SNAPSHOT: Delta Append (No PK)
     WITH new_data AS (
         SELECT
-    {',\n'.join(conversions)}
+    {conversion_string}
         FROM [{schema}].[{source_table}]
     )
     INSERT INTO [{schema}].[{target_table}] ({columns_clause})
