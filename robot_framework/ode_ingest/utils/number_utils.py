@@ -22,11 +22,7 @@ def safe_float_conversion(series: pd.Series) -> pd.Series:
     def convert_danish_number(value):
         if pd.isna(value) or value == '':
             return None
-        value_str = str(value).strip()
-        if '.' in value_str and ',' in value_str:
-            value_str = value_str.replace('.', '').replace(',', '.')
-        elif ',' in value_str:
-            value_str = value_str.replace(',', '.')
+        value_str = str(value).strip().replace('.', '').replace(',', '.')
         return Decimal(value_str).quantize(Decimal("0.01"))
     converted = series.apply(convert_danish_number)
     return converted

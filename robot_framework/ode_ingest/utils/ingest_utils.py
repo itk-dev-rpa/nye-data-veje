@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 from sqlalchemy import text
 
-from robot_framework.ode_ingest import table_definitions as table_columns
+from robot_framework.ode_ingest import table_definitions
 from robot_framework.ode_ingest.utils import file_utils, dataframe_utils, data_cleaning
 
 
@@ -22,9 +22,9 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     # Basic cleaning is necessary, SQL column names should not contain spaces.
     df = data_cleaning.clean_basic_data(df)
 
-    if table_name in table_columns.table_column_alias:
+    if table_name in table_definitions.table_column_alias:
         # Some columns have changed names, which we fix here
-        df.rename(columns=table_columns.table_column_alias[table_name], inplace=True)
+        df.rename(columns=table_definitions.table_column_alias[table_name], inplace=True)
 
     # --- LOGGING LOGIC START ---
     # Calculate stats before any filtering
@@ -32,7 +32,7 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     raw_columns = set(df.columns)
 
     # Determine which columns will be kept based on config
-    expected_columns = set(table_columns.table_used_columns[table_name])
+    expected_columns = set(table_definitions.table_used_columns[table_name])
 
     # Find columns present in file but NOT in our config (Silent Drops)
     dropped_columns_list = list(raw_columns - expected_columns)
@@ -40,7 +40,7 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     # --- LOGGING LOGIC END ---
 
     # Not all columns are needed and some contain sensitive information.
-    df = df[table_columns.table_used_columns[table_name]]
+    df = df[table_definitions.table_used_columns[table_name]]
 
     # Add data origin information
     date, _, _ = file_utils.get_file_sort_key(filepath)

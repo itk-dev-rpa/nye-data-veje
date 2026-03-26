@@ -26,12 +26,13 @@ from . import betalinger
 from . import stamdata
 
 # 1. Collect all definitions into a single list
-_all_definitions: List[TableDefinition] = []
-_all_definitions.extend(bilag.definitions)
-_all_definitions.extend(aftaler.definitions)
-_all_definitions.extend(rim.definitions)
-_all_definitions.extend(betalinger.definitions)
-_all_definitions.extend(stamdata.definitions)
+_all_definitions: List[TableDefinition] = (
+    bilag.definitions +
+    aftaler.definitions +
+    rim.definitions +
+    betalinger.definitions +
+    stamdata.definitions
+)
 
 # 2. Generate convenient dictionary interfaces from TableDefinition objects
 # These provide backward-compatible access patterns used throughout the codebase

@@ -10,8 +10,6 @@ Provides functions for:
 import re
 import tomllib
 from pathlib import Path
-from os import path
-import shutil
 from typing import List, Tuple, Optional
 from datetime import datetime
 
@@ -122,8 +120,10 @@ def move_processed_files(filepath: Path, processed_path: str = "processed_files"
         filepath: Path to the file to move
         processed_path: Subdirectory name for processed files (default: "processed_files")
     """
-    directory, filename = path.split(filepath)
-    shutil.move(filepath, path.join(directory, processed_path, filename))
+    filepath = Path(filepath)
+    target = filepath.parent / processed_path / filepath.name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    filepath.rename(target)
 
 
 def get_project_version() -> str:

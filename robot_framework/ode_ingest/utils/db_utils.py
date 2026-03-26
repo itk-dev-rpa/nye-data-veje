@@ -9,6 +9,7 @@ from typing import List
 import pandas as pd
 from sqlalchemy import create_engine, text, Engine, Table, MetaData, PrimaryKeyConstraint, Column
 from sqlalchemy.exc import SQLAlchemyError
+from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 from robot_framework import config
 from robot_framework.ode_ingest.table_definitions import table_keys, table_used_columns, data_types
 
@@ -87,7 +88,7 @@ def merge_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine
         pass  # Temp tables are typically cleaned automatically
 
 
-def create_table(table_name: str, columns_list: List[Column], oc) -> None:
+def create_table(table_name: str, columns_list: List[Column], oc: OrchestratorConnection) -> None:
     """
     Create a table in the SQL database with the specified name and columns.
 
