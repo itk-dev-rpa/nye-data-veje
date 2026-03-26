@@ -41,10 +41,7 @@ _all_definitions: List[TableDefinition] = (
 ALL_TABLE_NAMES = [d.name for d in _all_definitions]
 
 # Flattened dictionaries (auto-generated from TableDefinition objects)
-table_keys = {d.name: d.keys for d in _all_definitions}
-table_used_columns = {d.name: d.used_columns for d in _all_definitions}
-table_column_alias = {d.name: d.column_aliases for d in _all_definitions if d.column_aliases}
-data_types = {d.name: d.data_types for d in _all_definitions}
+all_tables = {d.name: d for d in _all_definitions}
 
 # Metadata columns added to all tables during ingestion
 metadata_columns = {

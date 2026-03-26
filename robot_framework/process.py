@@ -51,9 +51,9 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
     directory = orchestrator_connection.get_constant(config.DATA_DIRECTORY).value
     tables_to_process = config.TABLES_TO_PROCESS or table_definitions.ALL_TABLE_NAMES
     for table_name in tables_to_process:
-        table_schema = table_definitions.data_types.get(table_name, {})
+        table_schema = table_definitions.all_tables.get(table_name).data_types
         table_schema.update(table_definitions.metadata_columns)
-        primary_keys = table_definitions.table_keys.get(table_name, [])
+        primary_keys = table_definitions.all_tables.get(table_name).table_keys
 
         for subset in ["Total", "Delta"]:
             files = file_utils.find_files(directory, f"{table_name}_{subset}")

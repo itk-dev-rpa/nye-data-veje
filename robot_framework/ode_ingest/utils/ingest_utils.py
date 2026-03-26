@@ -22,9 +22,9 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     # Basic cleaning is necessary, SQL column names should not contain spaces.
     df = data_cleaning.clean_basic_data(df)
 
-    if table_name in table_definitions.table_column_alias:
+    if table_definitions.all_tables[table_name].table_column_alias:
         # Some columns have changed names, which we fix here
-        df.rename(columns=table_definitions.table_column_alias[table_name], inplace=True)
+        df.rename(columns=table_definitions.all_tables[table_name].table_column_alias, inplace=True)
 
     # --- LOGGING LOGIC START ---
     # Calculate stats before any filtering
@@ -32,7 +32,7 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     raw_columns = set(df.columns)
 
     # Determine which columns will be kept based on config
-    expected_columns = set(table_definitions.table_used_columns[table_name])
+    expected_columns = set(table_definitions.all_tables[table_name].used_columns)
 
     # Find columns present in file but NOT in our config (Silent Drops)
     dropped_columns_list = list(raw_columns - expected_columns)
@@ -40,7 +40,7 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     # --- LOGGING LOGIC END ---
 
     # Not all columns are needed and some contain sensitive information.
-    df = df[table_definitions.table_used_columns[table_name]]
+    df = df[table_definitions.all_tables[table_name].used_columns]
 
     # Add data origin information
     date, _, _ = file_utils.get_file_sort_key(filepath)

@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import Engine, Date, Numeric, Integer
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
-from robot_framework.ode_ingest.table_definitions import table_keys, table_used_columns, data_types
+from robot_framework.ode_ingest.table_definitions import all_tables
 from robot_framework.ode_ingest.utils.date_utils import DateRangeColumn
 from robot_framework.ode_ingest.utils import date_utils, number_utils
 from robot_framework import config
@@ -177,9 +177,9 @@ def set_types_and_keys(df: pd.DataFrame, table_name: str, identifier: str, oc: O
     Raises:
         BrokenPipeError: If all rows are removed during validation
     """
-    date_columns = [col for col, type_ in data_types[table_name].items() if type_ == Date]
-    number_columns = [col for col, type_ in data_types[table_name].items() if type_ in [Numeric, Integer]]
-    keys = table_keys[table_name]
+    date_columns = [col for col, type_ in all_tables[table_name].data_types.items() if type_ == Date]
+    number_columns = [col for col, type_ in all_tables[table_name].data_types.items() if type_ in [Numeric, Integer]]
+    keys = all_tables[table_name].keys
 
     if keys:
         df = _validate_initial_keys(df, keys, identifier, oc)
@@ -204,12 +204,18 @@ def set_types_and_keys(df: pd.DataFrame, table_name: str, identifier: str, oc: O
         raise BrokenPipeError("Dataframe was cleared by null check.")
 
     columns = set()
-    for table_dict in [table_used_columns, table_keys]:
-        if table_name in table_dict and table_dict[table_name]:
-            columns.update(table_dict[table_name])
+    for table in all_tables:
+        if table_name in table.table_used_columns:
+            columns.update(table.table_used_columns[table_name])
+
+    if table_name in all_tables:
+        d = all_tables[table_name]
+        for val in [d.used_columns, d.keys]:
+            if val:
+                columns.update(val)
     df = df[df.columns.intersection(columns)]
 
-    if table_keys[table_name] is None:
+    if keys is None:
         df.reset_index(allow_duplicates=True)
 
     return df

@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, text, Engine, Table, MetaData, PrimaryKeyC
 from sqlalchemy.exc import SQLAlchemyError
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 from robot_framework import config
-from robot_framework.ode_ingest.table_definitions import table_keys, table_used_columns, data_types
+from robot_framework.ode_ingest.table_definitions import all_tables
 
 
 def insert_data(df: pd.DataFrame, table_name: str, engine: Engine) -> None:
@@ -39,7 +39,7 @@ def merge_table_from_dataframe(df: pd.DataFrame, table_name: str, engine: Engine
         table_name: Table to merge the DataFrame into.
         engine: SQLAlchemy Engine for database connection.
     """
-    key_columns = table_keys[table_name]
+    key_columns = all_tables[table_name].keys
     if not key_columns:
         insert_data(df, table_name, engine)
         return
@@ -101,7 +101,7 @@ def create_table(table_name: str, columns_list: List[Column], oc: OrchestratorCo
     engine = create_engine(connection_string)
 
     metadata = MetaData(schema=config.DB_SCHEMA)
-    primary_keys = table_keys[table_name] if table_name in table_keys else None
+    primary_keys = all_tables[table_name].keys
 
     if primary_keys:
         primary_key_constraint = PrimaryKeyConstraint(*primary_keys)
@@ -122,8 +122,8 @@ def get_column_list_with_types(table_name: str) -> List[Column]:
         List of SQLAlchemy Column objects.
     """
     columns_list = []
-    for col in table_used_columns[table_name]:
-        column_type = data_types[table_name][col]
+    for col in all_tables[table_name].used_columns:
+        column_type = all_tables[table_name].data_types[col]
         columns_list.append(Column(col, column_type))
     return columns_list
 
