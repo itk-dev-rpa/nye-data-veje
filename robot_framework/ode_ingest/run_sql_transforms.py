@@ -216,7 +216,7 @@ def run_all_transforms(sql_dir: Path, oc,
 if __name__ == "__main__":
     conn_string = os.getenv("OpenOrchestratorConnString")
     crypto_key = os.getenv("OpenOrchestratorKey")
-    oc_main = OrchestratorConnection("ODE test", conn_string, crypto_key, "")
+    oc_main = OrchestratorConnection("ODE test", conn_string, crypto_key, "", "")
 
     sql_dir_main = Path('sql_transforms')
 
