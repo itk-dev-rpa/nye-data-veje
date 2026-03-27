@@ -14,19 +14,14 @@ schema information including:
 Usage:
     from robot_framework.ode_ingest.table_definitions import data_types, table_keys
 """
-from typing import List
 from sqlalchemy import String, Date, Integer
-from .common import TableDefinition
+from robot_framework.ode_ingest.table_definitions.common import TableDefinition
 
 # Import definition groups
-from . import bilag
-from . import aftaler
-from . import rim
-from . import betalinger
-from . import stamdata
+from robot_framework.ode_ingest.table_definitions import bilag, aftaler, rim, betalinger, stamdata
 
 # 1. Collect all definitions into a single list
-_all_definitions: List[TableDefinition] = (
+_all_definitions: list[TableDefinition] = (
     bilag.definitions +
     aftaler.definitions +
     rim.definitions +
