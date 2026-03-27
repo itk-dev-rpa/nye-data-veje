@@ -6,7 +6,7 @@ This module defines schema for installment payment agreements:
 - RIM-aftale-renter: Interest calculations for installments
 """
 from sqlalchemy import String, Date, Numeric, Integer
-from .common import TableDefinition
+from robot_framework.ode_ingest.table_definitions.common import TableDefinition
 
 rim_aftale = TableDefinition(
     name="RIM-aftale",

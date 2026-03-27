@@ -5,7 +5,7 @@ This module defines schema for payment-related tables:
 - Rykker: Payment reminders/dunning notices
 """
 from sqlalchemy import String, Date, Numeric, Integer
-from .common import TableDefinition
+from robot_framework.ode_ingest.table_definitions.common import TableDefinition
 
 indbetalinger = TableDefinition(
     name="Indbetalinger",

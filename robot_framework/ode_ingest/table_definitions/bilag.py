@@ -6,7 +6,7 @@ This module defines schema for invoice-related tables:
 - Bilag-lukket: Closed invoices
 """
 from sqlalchemy import String, Date, Numeric, Integer
-from .common import TableDefinition
+from robot_framework.ode_ingest.table_definitions.common import TableDefinition
 
 bilag_master = TableDefinition(
     name="Bilag-master",

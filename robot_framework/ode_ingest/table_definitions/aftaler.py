@@ -9,7 +9,7 @@ This module defines schema for various agreement types in the ODE system:
 - UU-aftale-haefter: Debt collection guarantors/co-debtors
 """
 from sqlalchemy import String, Date, Numeric, Integer
-from .common import TableDefinition
+from robot_framework.ode_ingest.table_definitions.common import TableDefinition
 
 aftaleindhold = TableDefinition(
     name="Aftaleindhold",

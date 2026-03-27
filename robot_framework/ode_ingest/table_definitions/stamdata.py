@@ -6,7 +6,7 @@ This module defines schema for master/reference data tables:
 - Opsaetning-Rykkerniveau: Reminder/dunning level configuration
 """
 from sqlalchemy import String, Date, Numeric, Integer
-from .common import TableDefinition
+from robot_framework.ode_ingest.table_definitions.common import TableDefinition
 
 forretningspartner = TableDefinition(
     name="Forretningspartner",
