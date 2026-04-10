@@ -22,9 +22,9 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     # Basic cleaning is necessary, SQL column names should not contain spaces.
     df = data_cleaning.clean_basic_data(df)
 
-    if table_definitions.all_tables[table_name].table_column_alias:
+    if table_definitions.all_tables[table_name].column_aliases:
         # Some columns have changed names, which we fix here
-        df.rename(columns=table_definitions.all_tables[table_name].table_column_alias, inplace=True)
+        df.rename(columns=table_definitions.all_tables[table_name].column_aliases, inplace=True)
 
     # --- LOGGING LOGIC START ---
     # Calculate stats before any filtering
@@ -39,15 +39,15 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
     dropped_columns_str = ", ".join(sorted(dropped_columns_list))
     # --- LOGGING LOGIC END ---
 
-    # Not all columns are needed and some contain sensitive information.
-    df = df[table_definitions.all_tables[table_name].used_columns]
-
     # Add data origin information
     date, _, _ = file_utils.get_file_sort_key(filepath)
     df["export_date"] = str(date)
     df["file_origin"] = filepath.name
     df['row_number'] = range(len(df))
     df['etl_version'] = file_utils.get_project_version()
+
+    # Not all columns are needed and some contain sensitive information.
+    df = df[table_definitions.all_tables[table_name].used_columns]
 
     stats = {
         "source_rows": initial_row_count,
