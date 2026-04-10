@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 10-04-2026
+
+- Fixed bad references
+
 ## [1.1.0] - 20-03-2026
 
 - Refactored and reworked ingest flow
