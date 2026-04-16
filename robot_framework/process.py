@@ -53,7 +53,7 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
     for table_name in tables_to_process:
         table_schema = table_definitions.all_tables.get(table_name).data_types
         table_schema.update(table_definitions.metadata_columns)
-        primary_keys = table_definitions.all_tables.get(table_name).table_keys
+        primary_keys = table_definitions.all_tables.get(table_name).keys
 
         for subset in ["Total", "Delta"]:
             files = file_utils.find_files(directory, f"{table_name}_{subset}")
@@ -63,6 +63,7 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
 
             # Loop through all files and add them to staging table
             for file_path in files:
+                stats = {}
                 try:
                     df, stats = ingest_utils.process_file(file_path, table_name)
                     print(f"\nLoaded file {file_path}: \n{stats}.")
@@ -74,7 +75,7 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                         table=table_name,
                         suffix=subset,
                         schema_dict=table_schema,
-                        primary_keys=primary_keys,
+                        primary_keys=primary_keys if primary_keys else [],
                         schema=config.DB_SCHEMA
                     )
                     run_sql_transforms.execute_sql_string_with_validation(
@@ -83,10 +84,9 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                     )
 
                     file_utils.move_processed_files(file_path)
-                    ingest_utils.log_ingest_stats(engine=engine, table_name="{table_name}_{subset}", filename=file_path.name, stats=stats, status="Success")
+                    ingest_utils.log_ingest_stats(engine=engine, table_name=f"{table_name}_{subset}", filename=file_path.name, stats=stats, status="Success")
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     print(f"  ✗ FEJL ved behandling af {file_path.name}: {e}")
-                    stats = stats if stats else {}
                     ingest_utils.log_ingest_stats(engine=engine, table_name=f"{table_name}_{subset}", filename=file_path.name, stats=stats, status="Fail", error=str(e))
                     break
 
