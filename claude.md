@@ -26,3 +26,13 @@ Du er en autonom udvikler for repoet “itk-dev-rpa/nye-data-veje”. Følg alti
 
 7) Læs mere / fulde retningslinjer
 - Se `CONTRIBUTING.md` i repoet for detaljer, eksempler og tjeklister.
+
+8) Vedligeholdelse af denne fil (claude.md)
+- Opdater denne fil, når der laves ændringer, der påvirker regler/adfærd: ændringer i generatorer, `table_definitions/`, ingest/transform-flow, eller nye ikke‑forhandlingsbare retningslinjer.
+- Brug “kurateret viden”: efter hver PR kan væsentlige erfaringer tilføjes i kondenseret form. Undgå rå notater eller lange eksempler.
+- Hold filen kort, så den altid kan indlæses i modelkonteksten: maks ca. 3–5 KB (≈150–200 linjer). Konsolider/forenkle ældre punkter løbende.
+- Læg detaljer og længere forklaringer i `CONTRIBUTING.md` eller i projektets Wiki/README. Henvis kun kort herfra.
+- Hvis filen nærmer sig størrelsesgrænsen, så:
+  - Konsolider gentagne regler til én punktopstilling
+  - Flyt specificerede implementeringsdetaljer til `CONTRIBUTING.md`
+  - Behold kun “Non‑negotiables” i `claude.md`
