@@ -335,25 +335,86 @@ def generate_snapshot_merge_sql(*, source_table: str, target_table: str,
     """
 
 
-def generate_validation_sql(staging_table: str, snapshot_table: str, schema: str) -> str:
-    """Generate validation query to output row count metrics.
+def generate_validation_sql(staging_table: str, snapshot_table: str, schema: str, primary_keys: list[str]) -> str:
+    """Generate validation queries (multiple metrics) as separate batches.
 
-    Args:
-        staging_table: Source staging table name
-        snapshot_table: Target snapshot table name
-        schema: SQL Server schema name
-
-    Returns:
-        SQL SELECT statement returning row counts for validation logging
+    Emits several SELECTs each in its own batch (separated by GO) so the runner
+    can capture each metric result set individually.
     """
-    return f"""
+    typed_table = staging_table.replace('_Staging', '_Typed')
+    backup_table = staging_table.replace('_Staging', '_Backup')
+
+    # Build PK expressions
+    if primary_keys:
+        pk_is_null_or_blank = ' OR '.join([f"[{pk}] IS NULL" for pk in primary_keys])
+        pk_join_typed_final = ' AND '.join([f"f.[{pk}] = t.[{pk}]" for pk in primary_keys])
+    else:
+        pk_is_null_or_blank = '1=0'  # no PKs
+        pk_join_typed_final = '1=0'
+
+    # Base metrics
+    metrics_sql = f"""
     -- D. Validation Metrics
     ------------------------------------------------------------
-    SELECT
-        'ROW_COUNTS' as metric,
-        (SELECT COUNT(*) FROM [{schema}].[{staging_table}]) as source_rows,
-        (SELECT COUNT(*) FROM [{schema}].[{snapshot_table}]) as target_rows;
+    SELECT 'ROW_COUNTS' AS metric,
+           (SELECT COUNT(*) FROM [{schema}].[{staging_table}])  AS source_rows,
+           (SELECT COUNT(*) FROM [{schema}].[{typed_table}])    AS typed_rows,
+           (SELECT COUNT(*) FROM [{schema}].[{snapshot_table}]) AS final_rows;
+    GO
+
+    SELECT 'PK_NULLS_STAGING' AS metric,
+           COUNT(*) AS cnt
+    FROM [{schema}].[{staging_table}]
+    WHERE {pk_is_null_or_blank};
+    GO
+
+    SELECT 'PK_DUPLICATES_TYPED' AS metric,
+           COUNT(*) AS cnt
+    FROM (
+        SELECT {', '.join([f'[{pk}]' for pk in primary_keys])}, COUNT(*) AS c
+        FROM [{schema}].[{typed_table}]
+        GROUP BY {', '.join([f'[{pk}]' for pk in primary_keys])}
+        HAVING COUNT(*) > 1
+    ) d;
+    GO
+
+    SELECT 'LOST_BACKUP_TO_TYPED' AS metric,
+           COUNT(*) AS cnt
+    FROM [{schema}].[{backup_table}] b
+    LEFT JOIN [{schema}].[{typed_table}] t
+      ON t.row_number = TRY_CAST(REPLACE(b.row_number, '.', '') AS INT)
+     AND t.file_origin = LTRIM(RTRIM(b.file_origin))
+    WHERE t.row_number IS NULL;
+    GO
+
+    SELECT 'LOST_TYPED_TO_FINAL' AS metric,
+           COUNT(*) AS cnt
+    FROM [{schema}].[{typed_table}] t
+    LEFT JOIN [{schema}].[{snapshot_table}] f
+      ON {pk_join_typed_final}
+    WHERE f.{primary_keys[0] if primary_keys else 'row_number'} IS NULL;
+    GO
     """
+
+    # Critical column example: Bilagsnummer (only for Indbetalinger schema)
+    if snapshot_table == 'Indbetalinger':
+        metrics_sql += f"""
+    -- Critical column: Bilagsnummer present in backup but missing in final
+    IF COL_LENGTH('{schema}.{snapshot_table}', 'Bilagsnummer') IS NOT NULL
+    BEGIN
+        SELECT 'CRITICAL_COL_NULLS_FINAL_Bilagsnummer' AS metric,
+               COUNT(*) AS cnt
+        FROM [{schema}].[{snapshot_table}] f
+        JOIN [{schema}].[{backup_table}] b
+          ON f.row_number = TRY_CAST(REPLACE(b.row_number, '.', '') AS INT)
+         AND f.file_origin = LTRIM(RTRIM(b.file_origin))
+        WHERE NULLIF(LTRIM(RTRIM(REPLACE(b.Bilagsnummer, '.', ''))), '') IS NOT NULL
+          AND (f.Bilagsnummer IS NULL OR LTRIM(RTRIM(f.Bilagsnummer)) = '');
+        GO
+    END
+        """
+
+    return metrics_sql
 
 
 def generate_transform_script_string(table: str, suffix: str, schema_dict: dict,
@@ -406,7 +467,7 @@ def generate_transform_script_string(table: str, suffix: str, schema_dict: dict,
     {generate_snapshot_merge_sql(source_table=staging_table, target_table=snapshot_table, schema_dict=schema_dict, primary_keys=primary_keys, schema=schema, is_delta=is_delta)}
     GO
 
-    {generate_validation_sql(staging_table, snapshot_table, schema)}
+    {generate_validation_sql(staging_table, snapshot_table, schema, primary_keys)}
     GO
 
     -- C. Cleanup (Optional - Staging table usually kept until file move is confirmed)

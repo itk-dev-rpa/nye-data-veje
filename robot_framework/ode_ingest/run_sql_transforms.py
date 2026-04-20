@@ -8,6 +8,7 @@ import os
 import json
 from pathlib import Path
 from datetime import datetime
+import re
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError, ResourceClosedError
@@ -19,36 +20,44 @@ from robot_framework import config
 def _process_validation_results(rows, log_key: str, validation_log: dict) -> None:
     """Process validation query results and log metrics.
 
-    Args:
-        rows: Query result rows
-        log_key: Key for validation log entry
-        validation_log: Dictionary to store validation results
+    Expects validation SELECTs to return a column named `metric` and either
+    a `cnt`/`count` integer or a set of named columns for row counts.
+    Any metric with a positive count is added to `issues`.
     """
     if not rows:
         return
 
-    first_row = rows[0]
+    # Ensure basic sections exist
+    entry = validation_log.setdefault(log_key, {})
+    entry.setdefault('issues', [])
 
-    # NULL in primary key report
-    if 'NULL_IN_PRIMARY_KEY' in str(first_row):
-        print(f"  ⚠ Found {len(rows)} rows with NULL in primary key")
-        validation_log[log_key]['issues'].append({
-            'type': 'null_in_primary_key',
-            'count': len(rows),
-            'sample': [dict(row._mapping) for row in rows[:5]]  # pylint: disable=protected-access
-        })
+    for row in rows:
+        row_dict = dict(row._mapping)  # pylint: disable=protected-access
+        metric = str(row_dict.get('metric', '')).upper()
+        if not metric:
+            continue
 
-    # Row count metrics
-    elif 'ROW_COUNTS' in str(first_row):
-        row_dict = dict(first_row._mapping)  # pylint: disable=protected-access
-        print(f"  Source rows: {row_dict.get('source_rows', 'N/A')}")
-        print(f"  Target rows: {row_dict.get('target_rows', 'N/A')}")
-        if 'excluded_rows' in row_dict:
-            excluded = row_dict['excluded_rows']
-            if excluded > 0:
-                print(f"  ⚠ Excluded rows: {excluded}")
+        # Generic row counts block
+        if metric == 'ROW_COUNTS':
+            # Support optional typed_rows/final_rows keys
+            entry['row_counts'] = row_dict
+            src = row_dict.get('source_rows')
+            tgt = row_dict.get('target_rows') or row_dict.get('final_rows')
+            if src is not None:
+                print(f"  Source rows: {src}")
+            if tgt is not None:
+                print(f"  Target rows: {tgt}")
+            continue
 
-        validation_log[log_key]['row_counts'] = row_dict
+        # All other metrics treated as issues with cnt/count value
+        cnt = row_dict.get('cnt', row_dict.get('count', 0))
+        try:
+            cnt_int = int(cnt) if cnt is not None else 0
+        except (TypeError, ValueError):
+            cnt_int = 0
+        if cnt_int > 0:
+            entry['issues'].append({'type': metric, 'count': cnt_int})
+            print(f"  ⚠ {metric}: {cnt_int}")
 
 
 def execute_sql_string_with_validation(sql_content: str, engine,
@@ -69,8 +78,8 @@ def execute_sql_string_with_validation(sql_content: str, engine,
     """
     print(f"\nExecuting transformation for {log_key}...")
 
-    # Split by GO statements
-    batches = [batch.strip() for batch in sql_content.split('GO\n') if batch.strip()]
+    # Robust split by GO statements (case-insensitive, supports CRLF and whitespace)
+    batches = [b.strip() for b in re.split(r"(?im)^\s*GO\s*$", sql_content) if b.strip()]
 
     validation_log[log_key] = {
         'executed_at': datetime.now().isoformat(),
@@ -79,26 +88,26 @@ def execute_sql_string_with_validation(sql_content: str, engine,
         'issues': []
     }
 
-    for i, batch in enumerate(batches[1:], 1):
+    for i, batch in enumerate(batches, 1):
         if not batch:
             continue
 
-        # Skip if the ENTIRE batch is just comments
-        lines = [line.strip() for line in batch.split('\n') if line.strip()]
-        if all(line.startswith('--') for line in lines):
+        # Remove pure comment lines but keep code
+        lines = [line for line in batch.split('\n') if line.strip()]
+        code_lines = [ln for ln in lines if not ln.lstrip().startswith('--')]
+        if not code_lines:
             continue
-        batch = "\n".join(line for line in lines if not line.startswith("--"))
+        batch_to_run = "\n".join(code_lines)
         with engine.begin() as connection:
             try:
-                result = connection.execute(text(batch))
-                # Capture results from SELECT statements
-                if batch.strip().upper().startswith(('SELECT', 'WITH')):
-                    try:
-                        rows = result.fetchall()
-                        _process_validation_results(rows, log_key, validation_log)
-                    except ResourceClosedError:
-                        # Some queries don't return results (INSERT, CREATE, etc)
-                        pass
+                result = connection.execute(text(batch_to_run))
+                # Try to capture results from SELECT statements (if any)
+                try:
+                    rows = result.fetchall()
+                    _process_validation_results(rows, log_key, validation_log)
+                except ResourceClosedError:
+                    # Batch does not return a result set (CREATE/INSERT/UPDATE/etc)
+                    pass
 
                 connection.commit()
 
