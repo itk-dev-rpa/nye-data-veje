@@ -46,8 +46,14 @@ Tak for at bidrage til projektet “itk-dev-rpa/nye-data-veje”. Dette dokument
   - Opret PR via browser-link (se ovenfor)
 
 ## 7) Versions- og changelog-praksis
-- `changelog.md` opdateres ved releases. Hotfix-beskrivelse kan stå i PR-teksten.
+- Opdater altid `changelog.md` på hver branch/PR med et kort afsnit under den nye version.
+- Inkrementér versionen i `pyproject.toml` på hver branch/PR efter SemVer:
+  - Hotfix/bugfix → patch (x.y.Z)
+  - Feature uden breaking changes → minor (x.Y.0)
+  - Breaking changes → major (X.0.0)
+- Notér ændringer under et nyt versionsafsnit i `changelog.md` med dato i format `DD-MM-YYYY`.
 - Migrations-DDL committes kun hvis vi versionerer DB-skemaer i repoet (pt. gør vi ikke). DDL til drift beskrives i PR eller i runtime-noter udenfor repo.
+- PR-tjekliste skal inkludere at både changelog og version er opdateret.
 
 ## 8) Stil og konsistens
 - Følg eksisterende kode-stil og mønstre.

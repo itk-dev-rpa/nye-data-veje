@@ -5,6 +5,8 @@
 
 ## Tjekliste
 - [ ] Følger CONTRIBUTING.md (branchnavn, Conventional Commits, ingen genereret SQL committed)
+- [ ] Changelog opdateret (changelog.md)
+- [ ] Version bump i pyproject.toml
 - [ ] Testet lokalt (beskriv kort hvordan)
 - [ ] Ingen breaking changes for API/kontrakter (eller beskriv nedenfor)
 - [ ] Dokumentation opdateret hvis relevant (README/changelog/notes)
