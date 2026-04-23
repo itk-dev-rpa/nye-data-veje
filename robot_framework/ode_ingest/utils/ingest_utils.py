@@ -26,6 +26,24 @@ def process_file(filepath: Path, table_name: str) -> tuple[pd.DataFrame, dict]:
         # Some columns have changed names, which we fix here
         df.rename(columns=table_definitions.all_tables[table_name].column_aliases, inplace=True)
 
+    # Apply Forretningspartner normalization early (before column filtering)
+    if 'Forretningspartner' in df.columns:
+        errors: list[str] = []
+        normalized_values = {}
+        for idx, val in df['Forretningspartner'].items():
+            try:
+                normalized_values[idx] = data_cleaning.normalize_forretningspartner_value(val)
+            except ValueError as ex:  # Collect and raise combined error with context
+                errors.append(f"index={idx}, value='{val}', error={ex}")
+        if errors:
+            sample = " ; ".join(errors[:10])
+            raise ValueError(
+                "Ugyldige Forretningspartner-værdier fundet under normalisering (max 8 cifre, kun ledende 0'er fjernes). "
+                f"Første eksempler: {sample}. Fil: {filepath.name}"
+            )
+        # Assign normalized column preserving index
+        df['Forretningspartner'] = pd.Series(normalized_values)
+
     # --- LOGGING LOGIC START ---
     # Calculate stats before any filtering
     initial_row_count = len(df)
