@@ -85,7 +85,7 @@ def normalize_forretningspartner_value(value: str) -> str | None:
     # Remove leading zeros only
     trimmed = s.lstrip('0')
     if len(trimmed) < 8:
-        trimmed = f"{"0" * (8 - len(trimmed))}{trimmed}"
+        trimmed = f"{'0' * (8 - len(trimmed))}{trimmed}"
     # Enforce max 8 digits
     if len(trimmed) > 8:
         raise ValueError(f"Forretningspartner har mere end 8 cifre efter normalisering: '{value}' -> '{trimmed}'")
