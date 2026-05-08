@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 20-04-2026
+
+- Fixed formatting og Indbetalinger > Bilagsnummer to avoid dropping ints that are too big.
+- Normalization of Forretningspartner ID to always be 8 digits.
+
 ## [1.1.1] - 10-04-2026
 
 - Fixed bad references

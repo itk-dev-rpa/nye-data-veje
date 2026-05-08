@@ -18,7 +18,7 @@ indbetalinger = TableDefinition(
         'Annuller_status': String(255), 'Anvendelsestekst': String(255), 'Art_kilde': String(255), 'Bankafregningskonto': String(255),
         'Bankforbindelse': String(255), 'Beløb': Numeric(precision=15, scale=2), 'Betalings_art': String(255),
         'Betalingsidentifikator': String(255), 'Betalingsmåde': String(255), 'Betalingsretning': String(255),
-        'Bilagsart': String(255), 'Bilagsnummer': Integer, 'Firmakode': String(255), 'Forretningsområde': String(255),
+        'Bilagsart': String(255), 'Bilagsnummer': String(255), 'Firmakode': String(255), 'Forretningsområde': String(255),
         'Forretningspartner': String(255), 'Kasse': String(255), 'Kommune_kode': String(255),
         'Konto-ID': String(255), 'Langtekst': String(255), 'Løbenummer': Integer, 'Oprettet_den': Date,
         'Skæringsdato': Date, 'Stak': String(255), 'Tidsstempel_for_deltaekstrakt': Date, 'Underapplikation': String(255),
