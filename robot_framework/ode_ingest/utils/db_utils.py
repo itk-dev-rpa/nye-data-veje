@@ -111,6 +111,11 @@ def create_table(table_name: str, columns_list: List[Column], oc: OrchestratorCo
     metadata.create_all(engine)
 
 
+def print_log(oc: OrchestratorConnection, message: str) -> None:
+    oc.log_trace(message)
+    print(message)
+
+
 def get_column_list_with_types(table_name: str) -> List[Column]:
     """
     Lookup and return a list of SQLAlchemy Column objects with types for a given table.

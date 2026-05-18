@@ -14,7 +14,7 @@ from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConn
 from sqlalchemy import create_engine
 
 from robot_framework.ode_ingest import run_sql_transforms, table_definitions, generate_transform_sql  # pylint: disable=no-name-in-module
-from robot_framework.ode_ingest.utils import file_utils, ingest_utils
+from robot_framework.ode_ingest.utils import file_utils, ingest_utils, db_utils
 from robot_framework import config
 
 
@@ -66,9 +66,10 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                 stats = {}
                 try:
                     df, stats = ingest_utils.process_file(file_path, table_name)
-                    print(f"\nLoaded file {file_path}: \n{stats}.")
+                    db_utils.print_log(orchestrator_connection, f"\nLoaded file {file_path}: \n{stats}.")
+
                     df.to_sql(f"{table_name}_{subset}_Staging", engine, schema=config.DB_SCHEMA, if_exists='append', index=False)
-                    print(f"\nStaged {table_name}_{subset}.")
+                    db_utils.print_log(orchestrator_connection, f"\nStaged {table_name}_{subset}.")
 
                     # Generate and execute SQL transformation in-memory
                     sql_script = generate_transform_sql.generate_transform_script_string(
