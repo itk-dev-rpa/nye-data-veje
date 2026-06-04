@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 04-06-2026
+
+- Added pytest-based unit test suite covering SQL transformation generator and ingest utility functions (data cleaning, number conversion, date conversion). No production code behavior changed.
+
 ## [1.1.3] - 04-06-2026
 
 - Fixed missing error-email value in config
