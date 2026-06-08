@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 
 from robot_framework.ode_ingest import run_sql_transforms, table_definitions, generate_transform_sql  # pylint: disable=no-name-in-module
 from robot_framework.ode_ingest.utils import file_utils, ingest_utils
+from robot_framework.ode_ingest.utils.log_utils import emit
 from robot_framework import config
 
 
@@ -47,9 +48,8 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
             with open(validation_log_file, 'r', encoding='utf-8') as f:
                 validation_log = json.load(f)
         except json.JSONDecodeError:
-            msg = "Could not read existing log file (possibly empty or corrupt). Starting new."
-            print(msg)
-            orchestrator_connection.log_info(msg)
+            emit(orchestrator_connection.log_info,
+                 "Could not read existing log file (possibly empty or corrupt). Starting new.")
 
     directory = orchestrator_connection.get_constant(config.DATA_DIRECTORY).value
     tables_to_process = config.TABLES_TO_PROCESS or table_definitions.ALL_TABLE_NAMES
@@ -59,7 +59,12 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
         table_schema.update(table_definitions.metadata_columns)
         primary_keys = table_definitions.all_tables.get(table_name).keys
 
+        # If anything fails for this table, skip the remaining subsets so we
+        # never apply Delta on top of an incomplete Total load.
+        table_failed = False
         for subset in ["Total", "Delta"]:
+            if table_failed:
+                break
             files = file_utils.find_files(directory, f"{table_name}_{subset}")
             if not files:
                 continue
@@ -70,13 +75,9 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                 stats = {}
                 try:
                     df, stats = ingest_utils.process_file(file_path, table_name)
-                    msg = f"Loaded file {file_path}: {stats}."
-                    print(msg)
-                    orchestrator_connection.log_info(msg)
+                    emit(orchestrator_connection.log_info, f"Loaded file {file_path}: {stats}.")
                     df.to_sql(f"{table_name}_{subset}_Staging", engine, schema=config.DB_SCHEMA, if_exists='append', index=False)
-                    msg = f"Staged {table_name}_{subset}."
-                    print(msg)
-                    orchestrator_connection.log_info(msg)
+                    emit(orchestrator_connection.log_info, f"Staged {table_name}_{subset}.")
 
                     # Generate and execute SQL transformation in-memory
                     sql_script = generate_transform_sql.generate_transform_script_string(
@@ -96,11 +97,11 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                     ingest_utils.log_ingest_stats(engine=engine, table_name=f"{table_name}_{subset}", filename=file_path.name, stats=stats, status="Success")
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     failure_descriptor = f"{table_name}_{subset}/{file_path.name}"
-                    error_msg = f"FEJL ved behandling af {failure_descriptor}: {e!r}\n\n{traceback.format_exc()}"
-                    print(error_msg)
-                    orchestrator_connection.log_error(error_msg)
+                    emit(orchestrator_connection.log_error,
+                         f"FEJL ved behandling af {failure_descriptor}: {e!r}\n\n{traceback.format_exc()}")
                     ingest_utils.log_ingest_stats(engine=engine, table_name=f"{table_name}_{subset}", filename=file_path.name, stats=stats, status="Fail", error=str(e))
                     file_failures.append(failure_descriptor)
+                    table_failed = True
                     break
 
                 with open(validation_log_file, 'w', encoding='utf-8') as f:
