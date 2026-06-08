@@ -16,13 +16,15 @@ from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConn
 from robot_framework import config
 
 
-def _process_validation_results(rows, log_key: str, validation_log: dict) -> None:
+def _process_validation_results(rows, log_key: str, validation_log: dict,
+                                orchestrator_connection: OrchestratorConnection) -> None:
     """Process validation query results and log metrics.
 
     Args:
         rows: Query result rows
         log_key: Key for validation log entry
         validation_log: Dictionary to store validation results
+        orchestrator_connection: OO connection used to surface metrics in the central log.
     """
     if not rows:
         return
@@ -31,7 +33,9 @@ def _process_validation_results(rows, log_key: str, validation_log: dict) -> Non
 
     # NULL in primary key report
     if 'NULL_IN_PRIMARY_KEY' in str(first_row):
-        print(f"  ⚠ Found {len(rows)} rows with NULL in primary key")
+        msg = f"Found {len(rows)} rows with NULL in primary key"
+        print(msg)
+        orchestrator_connection.log_info(msg)
         validation_log[log_key]['issues'].append({
             'type': 'null_in_primary_key',
             'count': len(rows),
@@ -41,18 +45,25 @@ def _process_validation_results(rows, log_key: str, validation_log: dict) -> Non
     # Row count metrics
     elif 'ROW_COUNTS' in str(first_row):
         row_dict = dict(first_row._mapping)  # pylint: disable=protected-access
-        print(f"  Source rows: {row_dict.get('source_rows', 'N/A')}")
-        print(f"  Target rows: {row_dict.get('target_rows', 'N/A')}")
+        src_msg = f"Source rows: {row_dict.get('source_rows', 'N/A')}"
+        tgt_msg = f"Target rows: {row_dict.get('target_rows', 'N/A')}"
+        print(src_msg)
+        print(tgt_msg)
+        orchestrator_connection.log_trace(src_msg)
+        orchestrator_connection.log_trace(tgt_msg)
         if 'excluded_rows' in row_dict:
             excluded = row_dict['excluded_rows']
             if excluded > 0:
-                print(f"  ⚠ Excluded rows: {excluded}")
+                msg = f"Excluded rows: {excluded}"
+                print(msg)
+                orchestrator_connection.log_info(msg)
 
         validation_log[log_key]['row_counts'] = row_dict
 
 
 def execute_sql_string_with_validation(sql_content: str, engine,
-                                       validation_log: dict, log_key: str) -> None:
+                                       validation_log: dict, log_key: str,
+                                       orchestrator_connection: OrchestratorConnection) -> None:
     """Execute SQL transformation script string and capture validation metrics.
 
     Splits SQL content by GO statements and executes each batch separately.
@@ -63,11 +74,15 @@ def execute_sql_string_with_validation(sql_content: str, engine,
         engine: SQLAlchemy engine for database connection
         validation_log: Dictionary to store validation results (modified in-place)
         log_key: Key for the validation log entry
+        orchestrator_connection: OO connection used to forward progress and
+            SQL-execution errors to OO's log in addition to stdout.
 
     Raises:
         Exception: Re-raises any SQL execution errors after logging them
     """
-    print(f"\nExecuting transformation for {log_key}...")
+    msg = f"Executing transformation for {log_key}..."
+    print(msg)
+    orchestrator_connection.log_trace(msg)
 
     # Split by GO statements
     batches = [batch.strip() for batch in sql_content.split('GO\n') if batch.strip()]
@@ -95,7 +110,8 @@ def execute_sql_string_with_validation(sql_content: str, engine,
                 if batch.strip().upper().startswith(('SELECT', 'WITH')):
                     try:
                         rows = result.fetchall()
-                        _process_validation_results(rows, log_key, validation_log)
+                        _process_validation_results(rows, log_key, validation_log,
+                                                    orchestrator_connection=orchestrator_connection)
                     except ResourceClosedError:
                         # Some queries don't return results (INSERT, CREATE, etc)
                         pass
@@ -103,17 +119,23 @@ def execute_sql_string_with_validation(sql_content: str, engine,
                 connection.commit()
 
             except SQLAlchemyError as exc:
-                print(f"  ✗ Error in batch {i}: {exc}")
+                err_msg = f"Error in batch {i}: {exc}"
+                print(err_msg)
+                orchestrator_connection.log_error(err_msg)
                 validation_log[log_key]['status'] = 'failed'
                 validation_log[log_key]['error'] = str(exc)
                 raise
 
     validation_log[log_key]['status'] = 'completed'
-    print("  ✓ Transformation completed")
+    done_msg = "Transformation completed"
+    print(done_msg)
+    orchestrator_connection.log_trace(done_msg)
 
 
 def execute_sql_file_with_validation(filepath: Path, engine,
-                                     validation_log: dict, log_key: str = None) -> None:
+                                     validation_log: dict,
+                                     orchestrator_connection: OrchestratorConnection,
+                                     log_key: str = None) -> None:
     """Execute SQL transformation script from file and capture validation metrics.
 
     Wrapper around execute_sql_string_with_validation that reads from a file.
@@ -122,12 +144,16 @@ def execute_sql_file_with_validation(filepath: Path, engine,
         filepath: Path to the SQL transformation script
         engine: SQLAlchemy engine for database connection
         validation_log: Dictionary to store validation results (modified in-place)
+        orchestrator_connection: OO connection, threaded through to
+            ``execute_sql_string_with_validation`` for centralized logging.
         log_key: Optional custom key for the validation log entry (defaults to filename)
 
     Raises:
         Exception: Re-raises any SQL execution errors after logging them
     """
-    print(f"\nExecuting {filepath.name}...")
+    msg = f"Executing {filepath.name}..."
+    print(msg)
+    orchestrator_connection.log_trace(msg)
 
     with open(filepath, 'r', encoding='utf-8') as f:
         sql_content = f.read()
@@ -136,10 +162,13 @@ def execute_sql_file_with_validation(filepath: Path, engine,
         log_key = filepath.stem.replace('transform_', '')
 
     # Update to use file name in log
-    execute_sql_string_with_validation(sql_content, engine, validation_log, log_key)
+    execute_sql_string_with_validation(sql_content, engine, validation_log, log_key,
+                                       orchestrator_connection=orchestrator_connection)
     # Override the script name to show actual file
     validation_log[log_key]['script'] = filepath.name
-    print(f"  ✓ {filepath.name} completed")
+    done_msg = f"{filepath.name} completed"
+    print(done_msg)
+    orchestrator_connection.log_trace(done_msg)
 
 
 def run_all_transforms(sql_dir: Path, oc,
@@ -168,9 +197,10 @@ def run_all_transforms(sql_dir: Path, oc,
 
     for script_file in table_scripts:
         try:
-            execute_sql_file_with_validation(script_file, engine, validation_log)
+            execute_sql_file_with_validation(script_file, engine, validation_log,
+                                             orchestrator_connection=oc)
         except SQLAlchemyError as exc:
-            print(f"\n✗ Failed to execute {script_file.name}")
+            print(f"\nFailed to execute {script_file.name}")
             print(f"  Error: {exc}")
 
             # response = input("\nContinue with remaining scripts? (y/n): ")
@@ -203,13 +233,13 @@ def run_all_transforms(sql_dir: Path, oc,
     ]
 
     if tables_with_issues:
-        print(f"\n⚠ Tables with validation issues: {len(tables_with_issues)}")
+        print(f"\nTables with validation issues: {len(tables_with_issues)}")
         for table in tables_with_issues:
             issues = validation_log[table]['issues']
             for issue in issues:
                 print(f"  - {table}: {issue['type']} ({issue['count']} rows)")
 
-    print(f"\n✓ Detailed validation log saved to: {validation_log_file}")
+    print(f"\nDetailed validation log saved to: {validation_log_file}")
     print("="*70)
 
 
@@ -222,7 +252,8 @@ if __name__ == "__main__":
 
     conn_str = oc_main.get_constant(config.DB_CONNECTION).value
     db_engine = create_engine(conn_str)
-    execute_sql_file_with_validation(Path("sql_transforms/transform_RIM-aftale-rater_Delta.sql"), db_engine, {})
+    execute_sql_file_with_validation(Path("sql_transforms/transform_RIM-aftale-rater_Delta.sql"), db_engine, {},
+                                     orchestrator_connection=oc_main)
     # if not sql_dir.exists():
     #     print(f"Error: Directory {sql_dir} not found")
     #     print("Run generate_transform_sql.py first to generate scripts")

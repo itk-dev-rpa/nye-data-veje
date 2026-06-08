@@ -8,6 +8,7 @@ This module orchestrates the complete data pipeline:
 """
 import json
 import os
+import traceback
 from pathlib import Path
 
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
@@ -46,10 +47,13 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
             with open(validation_log_file, 'r', encoding='utf-8') as f:
                 validation_log = json.load(f)
         except json.JSONDecodeError:
-            print("Could not read existing log file (possibly empty or corrupt). Starting new.")
+            msg = "Could not read existing log file (possibly empty or corrupt). Starting new."
+            print(msg)
+            orchestrator_connection.log_info(msg)
 
     directory = orchestrator_connection.get_constant(config.DATA_DIRECTORY).value
     tables_to_process = config.TABLES_TO_PROCESS or table_definitions.ALL_TABLE_NAMES
+    file_failures: list[str] = []
     for table_name in tables_to_process:
         table_schema = table_definitions.all_tables.get(table_name).data_types
         table_schema.update(table_definitions.metadata_columns)
@@ -66,9 +70,13 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                 stats = {}
                 try:
                     df, stats = ingest_utils.process_file(file_path, table_name)
-                    print(f"\nLoaded file {file_path}: \n{stats}.")
+                    msg = f"Loaded file {file_path}: {stats}."
+                    print(msg)
+                    orchestrator_connection.log_info(msg)
                     df.to_sql(f"{table_name}_{subset}_Staging", engine, schema=config.DB_SCHEMA, if_exists='append', index=False)
-                    print(f"\nStaged {table_name}_{subset}.")
+                    msg = f"Staged {table_name}_{subset}."
+                    print(msg)
+                    orchestrator_connection.log_info(msg)
 
                     # Generate and execute SQL transformation in-memory
                     sql_script = generate_transform_sql.generate_transform_script_string(
@@ -80,18 +88,29 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                     )
                     run_sql_transforms.execute_sql_string_with_validation(
                         sql_script, engine, validation_log,
-                        log_key=f"{table_name}_{subset} ({file_path.name})"
+                        log_key=f"{table_name}_{subset} ({file_path.name})",
+                        orchestrator_connection=orchestrator_connection,
                     )
 
                     file_utils.move_processed_files(file_path)
                     ingest_utils.log_ingest_stats(engine=engine, table_name=f"{table_name}_{subset}", filename=file_path.name, stats=stats, status="Success")
                 except Exception as e:  # pylint: disable=broad-exception-caught
-                    print(f"  ✗ FEJL ved behandling af {file_path.name}: {e}")
+                    failure_descriptor = f"{table_name}_{subset}/{file_path.name}"
+                    error_msg = f"FEJL ved behandling af {failure_descriptor}: {e!r}\n\n{traceback.format_exc()}"
+                    print(error_msg)
+                    orchestrator_connection.log_error(error_msg)
                     ingest_utils.log_ingest_stats(engine=engine, table_name=f"{table_name}_{subset}", filename=file_path.name, stats=stats, status="Fail", error=str(e))
+                    file_failures.append(failure_descriptor)
                     break
 
                 with open(validation_log_file, 'w', encoding='utf-8') as f:
                     json.dump(validation_log, f, indent=2)
+
+    if file_failures:
+        raise RuntimeError(
+            f"Process completed with {len(file_failures)} file failure(s): "
+            + ", ".join(file_failures)
+        )
 
 
 if __name__ == "__main__":
