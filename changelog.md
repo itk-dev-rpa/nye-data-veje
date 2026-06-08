@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.4] - 08-06-2026
+
+- Fixed silent failure: per-file processing errors are now logged to OpenOrchestrator via `log_error` (not just stdout) and the whole run is marked as failed by raising `RuntimeError` after the loop when any file failed.
+- Threaded `orchestrator_connection` through `execute_sql_string_with_validation`, `execute_sql_file_with_validation`, and `_process_validation_results` so SQL execution progress and validation metrics also surface in the OO log via `log_info` and `log_trace`.
+
 ## [1.1.3] - 04-06-2026
 
 - Fixed missing error-email value in config
