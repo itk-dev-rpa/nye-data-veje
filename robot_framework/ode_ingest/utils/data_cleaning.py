@@ -56,17 +56,18 @@ def make_columns_unique(cols):
     return result
 
 
-def normalize_forretningspartner_value(value: str) -> str | None:
+def normalize_forretningspartner_value(value) -> str | None:
     """Normalize a single Forretningspartner value according to business rules.
 
     Rules:
+    - Missing values (None, float NaN, empty string, whitespace) return None
     - Only remove leading zeros (no other digits are removed)
     - After removing leading zeros, there may be at most 8 digits
     - If there are more than 8 digits and removing leading zeros does not fix it, raise ValueError
-    - Empty/NaN stays None; a value consisting entirely of zeros becomes "0"
+    - A non-empty value containing non-digit characters raises ValueError
 
     Args:
-        value: Raw value from source CSV
+        value: Raw value from source CSV (str, float NaN, None, etc.)
 
     Returns:
         Normalized string (digits only) or None
@@ -76,8 +77,11 @@ def normalize_forretningspartner_value(value: str) -> str | None:
     """
     if value is None:
         return None
+    # Catch float NaN before str() turns it into the literal string "nan"
+    if pd.isna(value):
+        return None
     s = str(value).strip()
-    if s == "" or pd.isna(s):
+    if s == "":
         return None
     # Must be digits only
     if not re.fullmatch(r"\d+", s):

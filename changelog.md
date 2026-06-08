@@ -5,12 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.5] - 08-06-2026
+
+
+- Fixed `normalize_forretningspartner_value` to treat float NaN as a missing value (returns `None`) before stringification, instead of raising on the literal string `'nan'`. Missing Forretningspartner values no longer fail ingestion on tables where it is not part of the primary key.
+- On per-table failure, the remaining subsets (e.g. `Delta` after a `Total` failure) are now skipped to avoid applying delta-loads on top of an incomplete total. Other tables continue processing as before.
 
 ## [1.1.4] - 08-06-2026
 
 - Fixed silent failure: per-file processing errors are now logged to OpenOrchestrator via `log_error` (not just stdout) and the whole run is marked as failed by raising `RuntimeError` after the loop when any file failed.
 - Threaded `orchestrator_connection` through `execute_sql_string_with_validation`, `execute_sql_file_with_validation`, and `_process_validation_results` so SQL execution progress and validation metrics also surface in the OO log via `log_info` and `log_trace`.
+- Fixed `normalize_forretningspartner_value` to treat float NaN as a missing value (returns `None`) before stringification, instead of raising on the literal string `'nan'`. Missing Forretningspartner values no longer fail ingestion on tables where it is not part of the primary key.
+- On per-table failure, the remaining subsets (e.g. `Delta` after a `Total` failure) are now skipped to avoid applying delta-loads on top of an incomplete total. Other tables continue processing as before.
 
 ## [1.1.3] - 04-06-2026
 

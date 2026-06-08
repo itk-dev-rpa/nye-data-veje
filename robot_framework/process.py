@@ -59,7 +59,12 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
         table_schema.update(table_definitions.metadata_columns)
         primary_keys = table_definitions.all_tables.get(table_name).keys
 
+        # If anything fails for this table, skip the remaining subsets so we
+        # never apply Delta on top of an incomplete Total load.
+        table_failed = False
         for subset in ["Total", "Delta"]:
+            if table_failed:
+                break
             files = file_utils.find_files(directory, f"{table_name}_{subset}")
             if not files:
                 continue
@@ -101,6 +106,7 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
                     orchestrator_connection.log_error(error_msg)
                     ingest_utils.log_ingest_stats(engine=engine, table_name=f"{table_name}_{subset}", filename=file_path.name, stats=stats, status="Fail", error=str(e))
                     file_failures.append(failure_descriptor)
+                    table_failed = True
                     break
 
                 with open(validation_log_file, 'w', encoding='utf-8') as f:
