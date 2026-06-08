@@ -14,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError, ResourceClosedError
 
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 from robot_framework import config
+from robot_framework.ode_ingest.utils.log_utils import emit
 
 
 def _process_validation_results(rows, log_key: str, validation_log: dict,
@@ -33,9 +34,8 @@ def _process_validation_results(rows, log_key: str, validation_log: dict,
 
     # NULL in primary key report
     if 'NULL_IN_PRIMARY_KEY' in str(first_row):
-        msg = f"Found {len(rows)} rows with NULL in primary key"
-        print(msg)
-        orchestrator_connection.log_info(msg)
+        emit(orchestrator_connection.log_info,
+             f"Found {len(rows)} rows with NULL in primary key")
         validation_log[log_key]['issues'].append({
             'type': 'null_in_primary_key',
             'count': len(rows),
@@ -45,18 +45,14 @@ def _process_validation_results(rows, log_key: str, validation_log: dict,
     # Row count metrics
     elif 'ROW_COUNTS' in str(first_row):
         row_dict = dict(first_row._mapping)  # pylint: disable=protected-access
-        src_msg = f"Source rows: {row_dict.get('source_rows', 'N/A')}"
-        tgt_msg = f"Target rows: {row_dict.get('target_rows', 'N/A')}"
-        print(src_msg)
-        print(tgt_msg)
-        orchestrator_connection.log_trace(src_msg)
-        orchestrator_connection.log_trace(tgt_msg)
+        emit(orchestrator_connection.log_trace,
+             f"Source rows: {row_dict.get('source_rows', 'N/A')}")
+        emit(orchestrator_connection.log_trace,
+             f"Target rows: {row_dict.get('target_rows', 'N/A')}")
         if 'excluded_rows' in row_dict:
             excluded = row_dict['excluded_rows']
             if excluded > 0:
-                msg = f"Excluded rows: {excluded}"
-                print(msg)
-                orchestrator_connection.log_info(msg)
+                emit(orchestrator_connection.log_info, f"Excluded rows: {excluded}")
 
         validation_log[log_key]['row_counts'] = row_dict
 
@@ -80,9 +76,7 @@ def execute_sql_string_with_validation(sql_content: str, engine,
     Raises:
         Exception: Re-raises any SQL execution errors after logging them
     """
-    msg = f"Executing transformation for {log_key}..."
-    print(msg)
-    orchestrator_connection.log_trace(msg)
+    emit(orchestrator_connection.log_trace, f"Executing transformation for {log_key}...")
 
     # Split by GO statements
     batches = [batch.strip() for batch in sql_content.split('GO\n') if batch.strip()]
@@ -119,17 +113,13 @@ def execute_sql_string_with_validation(sql_content: str, engine,
                 connection.commit()
 
             except SQLAlchemyError as exc:
-                err_msg = f"Error in batch {i}: {exc}"
-                print(err_msg)
-                orchestrator_connection.log_error(err_msg)
+                emit(orchestrator_connection.log_error, f"Error in batch {i}: {exc}")
                 validation_log[log_key]['status'] = 'failed'
                 validation_log[log_key]['error'] = str(exc)
                 raise
 
     validation_log[log_key]['status'] = 'completed'
-    done_msg = "Transformation completed"
-    print(done_msg)
-    orchestrator_connection.log_trace(done_msg)
+    emit(orchestrator_connection.log_trace, "Transformation completed")
 
 
 def execute_sql_file_with_validation(filepath: Path, engine,
@@ -151,9 +141,7 @@ def execute_sql_file_with_validation(filepath: Path, engine,
     Raises:
         Exception: Re-raises any SQL execution errors after logging them
     """
-    msg = f"Executing {filepath.name}..."
-    print(msg)
-    orchestrator_connection.log_trace(msg)
+    emit(orchestrator_connection.log_trace, f"Executing {filepath.name}...")
 
     with open(filepath, 'r', encoding='utf-8') as f:
         sql_content = f.read()
@@ -166,9 +154,7 @@ def execute_sql_file_with_validation(filepath: Path, engine,
                                        orchestrator_connection=orchestrator_connection)
     # Override the script name to show actual file
     validation_log[log_key]['script'] = filepath.name
-    done_msg = f"{filepath.name} completed"
-    print(done_msg)
-    orchestrator_connection.log_trace(done_msg)
+    emit(orchestrator_connection.log_trace, f"{filepath.name} completed")
 
 
 def run_all_transforms(sql_dir: Path, oc,
